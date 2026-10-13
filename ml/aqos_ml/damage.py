@@ -355,7 +355,14 @@ def score(cells, scoring, unworkable=None, conditions=COUNTED):
         for tin in TINS:
             self_damage = own[tin] - min(own.values())
             harm = others[tin] - others["best_effort"]
-            raw[tin] = self_damage + scoring["harm_weight"] * harm
+            # Relief to the others is credited only to a flow that gives
+            # up next to nothing for it. A backup in Bulk loses nothing and
+            # saves the call beside it: that is what Bulk is for. A call in
+            # Bulk is ruined, and that it frees room for a second call on
+            # the same device does not make Bulk the place for calls: the
+            # rule would be applied to both, and ruin both.
+            counted = harm if harm > 0 or self_damage <= scoring.get("relief_free", 1.0) else 0.0
+            raw[tin] = self_damage + scoring["harm_weight"] * counted
             rows.append({
                 "profile": profile, "class": TAXONOMY["profiles"][profile], "condition": link, "tin": tin,
                 "seeds": len(by_tin[tin]["self"]),

@@ -55,3 +55,9 @@ unworkable: 0.9
 # a finer table, noise would choose between tins that are really the same.
 # Equal cells go to Best Effort.
 resolution: 0.5
+
+# A flow that makes room for the others by being put somewhere worse is
+# credited with their relief only if its own cost rises by no more than
+# this. Above it, the relief counts for nothing: sacrificing one call to
+# save another on the same device is not a placement rule for calls.
+relief_free: 0.1

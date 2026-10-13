@@ -7,48 +7,48 @@
 # The numbers behind each cell are in damage_measurements.csv; the thresholds are
 # in damage_scoring.yaml.
 status: measured
-seeds_per_cell: 1
+seeds_per_cell: [1, 2]
 resolution: 0.5
 # Left out, because the flow worked in no tin on that link:
-unworkable: [cloud_gaming on tight seed 1, cloud_gaming on uplink seed 1, cloud_gaming on uplink2 seed 1, video_call on uplink2 seed 1]
+unworkable: [cloud_gaming on tight seed 1, cloud_gaming on uplink seed 1, cloud_gaming on uplink seed 2, cloud_gaming on uplink2 seed 1, video_call on uplink2 seed 1]
 damage:
   telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 0}
-  realtime_interactive:    {voice: 0, video: 0, best_effort: 2.5, bulk: 5}
-  multimedia_conferencing: {voice: 2, video: 0, best_effort: 2, bulk: 0.5}
-  multimedia_streaming:    {voice: 0, video: 1.5, best_effort: 0.5, bulk: 2.5}
-  standard:                {voice: 0, video: 3.5, best_effort: 0, bulk: 6}
-  high_throughput_data:    {voice: 0.5, video: 4.5, best_effort: 0, bulk: 7.5}
-  low_priority_data:       {voice: 3.5, video: 3.5, best_effort: 3, bulk: 0}
+  realtime_interactive:    {voice: 0, video: 0, best_effort: 2.5, bulk: 6}
+  multimedia_conferencing: {voice: 1.5, video: 0, best_effort: 2, bulk: 2.5}
+  multimedia_streaming:    {voice: 0, video: 1, best_effort: 0.5, bulk: 1.5}
+  standard:                {voice: 0, video: 3.5, best_effort: 0, bulk: 7}
+  high_throughput_data:    {voice: 0.5, video: 4.5, best_effort: 0, bulk: 7}
+  low_priority_data:       {voice: 2, video: 2, best_effort: 1.5, bulk: 0}
 by_condition:
   alone:
     telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 0}
-    realtime_interactive:    {voice: 0, video: 0, best_effort: 0, bulk: 5}
-    multimedia_conferencing: {voice: 0, video: 0, best_effort: 0, bulk: 1}
-    multimedia_streaming:    {voice: 0, video: 0, best_effort: 0, bulk: 1.5}
-    standard:                {voice: 0, video: 0, best_effort: 0, bulk: 7.5}
+    realtime_interactive:    {voice: 0, video: 0, best_effort: 0, bulk: 5.5}
+    multimedia_conferencing: {voice: 0, video: 0.5, best_effort: 0, bulk: 0.5}
+    multimedia_streaming:    {voice: 0, video: 0, best_effort: 0, bulk: 1}
+    standard:                {voice: 0, video: 0, best_effort: 0, bulk: 8.5}
     high_throughput_data:    {voice: 0.5, video: 0, best_effort: 0, bulk: 8}
     low_priority_data:       {voice: 0, video: 0, best_effort: 0, bulk: 0}
   crowded:
     telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 0}
-    realtime_interactive:    {voice: 0, video: 0, best_effort: 5, bulk: 5}
-    multimedia_conferencing: {voice: 0, video: 0, best_effort: 0, bulk: 3}
-    multimedia_streaming:    {voice: 0, video: 0, best_effort: 1.5, bulk: 2.5}
-    standard:                {voice: 0, video: 0, best_effort: 0, bulk: 1.5}
-    high_throughput_data:    {voice: 0.5, video: 3, best_effort: 0, bulk: 6.5}
-    low_priority_data:       {voice: 0.5, video: 1, best_effort: 0, bulk: 0}
+    realtime_interactive:    {voice: 0, video: 0, best_effort: 5, bulk: 6}
+    multimedia_conferencing: {voice: 0, video: 0.5, best_effort: 0, bulk: 1.5}
+    multimedia_streaming:    {voice: 0, video: 0, best_effort: 0.5, bulk: 1.5}
+    standard:                {voice: 0, video: 0, best_effort: 0, bulk: 2.5}
+    high_throughput_data:    {voice: 0.5, video: 3, best_effort: 0, bulk: 6}
+    low_priority_data:       {voice: 2, video: 1.5, best_effort: 0, bulk: 0}
   tight:
     telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 0}
     realtime_interactive:    {voice: 0, video: 0, best_effort: 0, bulk: 0}
-    multimedia_streaming:    {voice: 0, video: 0, best_effort: 0, bulk: 3}
+    multimedia_streaming:    {voice: 0, video: 0, best_effort: 0, bulk: 3.5}
     standard:                {voice: 0, video: 0, best_effort: 0, bulk: 6.5}
   uplink:
     telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 0}
     realtime_interactive:    {voice: 0, video: 0, best_effort: 0, bulk: 0}
-    multimedia_conferencing: {voice: 8.5, video: 3, best_effort: 8.5, bulk: 0}
-    multimedia_streaming:    {voice: 0, video: 5, best_effort: 0.5, bulk: 3.5}
+    multimedia_conferencing: {voice: 6, video: 0, best_effort: 6, bulk: 6}
+    multimedia_streaming:    {voice: 0, video: 3, best_effort: 0.5, bulk: 3}
     standard:                {voice: 0, video: 10, best_effort: 0, bulk: 10}
     high_throughput_data:    {voice: 0, video: 10, best_effort: 0, bulk: 7.5}
-    low_priority_data:       {voice: 9.5, video: 10, best_effort: 9.5, bulk: 0}
+    low_priority_data:       {voice: 4.5, video: 4.5, best_effort: 4.5, bulk: 0}
   uplink2:
     telephony:               {voice: 0, video: 0, best_effort: 0, bulk: 1.5}
     realtime_interactive:    {voice: 0, video: 0, best_effort: 0, bulk: 10}
