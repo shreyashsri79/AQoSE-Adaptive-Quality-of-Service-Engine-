@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+.pytest_cache/
+/bin/
+/results/
+/data/raw/
+*.pcap
+*.pcapng
+/data/public/
+/data/ext
+/data/fetch.log
+/data/*.cookie
+/kaggle/*.local.*
+/results-train/
+/data/dataset/
+/results-damage/
+# Draft models are for trying the pipeline, not for keeping.
+/models/*draft*
+/results-live/
+# Every results directory: smoke, core, A/A and whatever comes next.
+/results-*/
+# Result archives downloaded from Kaggle.
+/results*.zip
+# The random forest is 12 MB and is not the chosen model; training rebuilds it.
+/models/rf-*/model.joblib
