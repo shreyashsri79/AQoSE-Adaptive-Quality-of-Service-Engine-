@@ -11,6 +11,9 @@
 #
 # It does not touch the testbed, so it is safe while experiments run.
 #
+# AQOS_APP, AQOS_NOTES and AQOS_SECONDS answer the three questions asked
+# per activity in advance (scripts/capture-whatsapp.sh uses them).
+#
 # The captures need you. For each activity: get the app ready but do NOT
 # start the activity, press Enter, and start it only once recording has
 # begun. The classifier works from a flow's first 8 packets, so a call or
@@ -88,13 +91,16 @@ kept=0
 for activity in "${activities[@]}"; do
     echo
     echo "---- $activity"
-    read -rp "App name (for example \"Google Meet\"), or s to skip: " app
+    app=${AQOS_APP:-}
+    [[ -n $app ]] || read -rp "App name (for example \"Google Meet\"), or s to skip: " app
     if [[ -z $app || $app == s ]]; then
         echo "skipped"
         continue
     fi
-    read -rp "What exactly, optional (for example \"Asphalt 9, racing\" or \"1-to-1 call, camera on\"): " notes
-    read -rp "Seconds to record [120]: " seconds
+    notes=${AQOS_NOTES:-}
+    [[ -n ${AQOS_NOTES+set} ]] || read -rp "What exactly, optional (for example \"Asphalt 9, racing\" or \"1-to-1 call, camera on\"): " notes
+    seconds=${AQOS_SECONDS:-}
+    [[ -n $seconds ]] || read -rp "Seconds to record [120]: " seconds
     seconds=${seconds:-120}
     echo "Get $app ready, but do NOT start the $activity yet (not in the call, download not started,"
     echo "game fully closed back to the list). A stream still running from the last round is useless."
