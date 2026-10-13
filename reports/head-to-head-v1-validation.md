@@ -4,9 +4,9 @@ Dataset `v1` (sha256 `fe91bbad5e5e`), 3607 flows from 370 sessions. Damage table
 
 ## Verdict: go
 
-- LightGBM, expected damage (O2) has lower balanced expected damage than the tuned rules: 0.075 against 0.745 (difference -0.670, 95% interval -0.757 to -0.583).
+- LightGBM, expected damage (O2) has lower balanced expected damage than the tuned rules: 0.141 against 0.745 (difference -0.604, 95% interval -0.693 to -0.517).
 - Video calls (443 flows): damage 0.01 against the rules' 1.52; sent to Bulk 0% against 0%.
-- Cloud gaming (106 flows): damage 0.00 against the rules' 0.85; sent to Bulk 0% against 2%.
+- Cloud gaming (106 flows): damage 0.02 against the rules' 0.85; sent to Bulk 0% against 2%.
 
 ## Scores
 
@@ -15,9 +15,9 @@ Dataset `v1` (sha256 `fe91bbad5e5e`), 3607 flows from 370 sessions. Damage table
 | Rules, qosify defaults | 1.991 | +1.246 (+1.031 to +1.485) | 0.460 | 0.110 |  |
 | Rules, tuned (4000 pkt/s, 1200 B) | 0.745 |  | 0.418 | 0.104 |  |
 | Random forest, top label (O1) | 0.279 | -0.466 (-0.524 to -0.396) | 0.942 | 0.719 | 0.025 |
-| Random forest, expected damage (O2) | 0.079 | -0.666 (-0.754 to -0.582) | 0.942 | 0.719 | 0.025 |
+| Random forest, expected damage (O2) | 0.146 | -0.599 (-0.687 to -0.514) | 0.942 | 0.719 | 0.025 |
 | LightGBM, top label (O1) | 0.294 | -0.451 (-0.524 to -0.356) | 0.944 | 0.735 | 0.052 |
-| LightGBM, expected damage (O2) | 0.075 | -0.670 (-0.757 to -0.583) | 0.944 | 0.735 | 0.052 |
+| LightGBM, expected damage (O2) | 0.141 | -0.604 (-0.693 to -0.517) | 0.944 | 0.735 | 0.052 |
 
 Lower damage is better. The interval comes from resampling whole sessions 2,000 times; one that stays below zero means the contestant beats the tuned rules.
 
@@ -29,9 +29,9 @@ Lower damage is better. The interval comes from resampling whole sessions 2,000 
 | Rules, qosify defaults | 0.00 | 5.51 | 1.89 | 1.04 | 0.01 | 4.13 | 1.37 |
 | Rules, tuned (4000 pkt/s, 1200 B) | 0.00 | 0.83 | 1.52 | 0.21 | 0.00 | 0.75 | 1.92 |
 | Random forest, top label (O1) | 0.00 | 0.01 | 0.01 | 0.95 | 0.12 | 0.40 | 0.46 |
-| Random forest, expected damage (O2) | 0.00 | 0.03 | 0.01 | 0.02 | 0.02 | 0.02 | 0.45 |
+| Random forest, expected damage (O2) | 0.00 | 0.05 | 0.01 | 0.50 | 0.03 | 0.00 | 0.44 |
 | LightGBM, top label (O1) | 0.00 | 0.00 | 0.01 | 0.95 | 0.13 | 0.43 | 0.52 |
-| LightGBM, expected damage (O2) | 0.00 | 0.00 | 0.01 | 0.02 | 0.02 | 0.03 | 0.44 |
+| LightGBM, expected damage (O2) | 0.00 | 0.02 | 0.01 | 0.50 | 0.02 | 0.00 | 0.43 |
 
 ## The traffic the project is about
 
@@ -40,9 +40,9 @@ Lower damage is better. The interval comes from resampling whole sessions 2,000 
 | Rules, qosify defaults | 15% of 443 | 1.89 | 89% of 106 | 5.51 |
 | Rules, tuned (4000 pkt/s, 1200 B) | 0% of 443 | 1.52 | 2% of 106 | 0.85 |
 | Random forest, top label (O1) | 0% of 443 | 0.01 | 0% of 106 | 0.01 |
-| Random forest, expected damage (O2) | 0% of 443 | 0.01 | 0% of 106 | 0.03 |
+| Random forest, expected damage (O2) | 0% of 443 | 0.01 | 0% of 106 | 0.05 |
 | LightGBM, top label (O1) | 0% of 443 | 0.01 | 0% of 106 | 0.00 |
-| LightGBM, expected damage (O2) | 0% of 443 | 0.01 | 0% of 106 | 0.00 |
+| LightGBM, expected damage (O2) | 0% of 443 | 0.01 | 0% of 106 | 0.02 |
 
 ## Where each class's flows were sent
 
@@ -86,13 +86,13 @@ Lower damage is better. The interval comes from resampling whole sessions 2,000 
 
 | True class | voice | video | best_effort | bulk | Recall |
 | --- | --- | --- | --- | --- | --- |
-| telephony | 45% | 0% | 37% | 18% | 0.53 |
-| realtime_interactive | 99% | 0% | 1% | 0% | 0.98 |
+| telephony | 34% | 0% | 47% | 18% | 0.53 |
+| realtime_interactive | 98% | 1% | 1% | 0% | 0.98 |
 | multimedia_conferencing | 0% | 100% | 0% | 0% | 1.00 |
-| multimedia_streaming | 96% | 0% | 4% | 0% | 0.91 |
-| standard | 11% | 0% | 88% | 0% | 0.94 |
-| high_throughput_data | 4% | 0% | 96% | 0% | 0.90 |
-| low_priority_data | 3% | 0% | 26% | 71% | 0.75 |
+| multimedia_streaming | 0% | 0% | 100% | 0% | 0.91 |
+| standard | 1% | 0% | 99% | 0% | 0.94 |
+| high_throughput_data | 0% | 0% | 100% | 0% | 0.90 |
+| low_priority_data | 0% | 0% | 29% | 71% | 0.75 |
 
 **LightGBM, top label (O1)**
 
@@ -110,13 +110,13 @@ Lower damage is better. The interval comes from resampling whole sessions 2,000 
 
 | True class | voice | video | best_effort | bulk | Recall |
 | --- | --- | --- | --- | --- | --- |
-| telephony | 68% | 0% | 13% | 18% | 0.74 |
-| realtime_interactive | 98% | 2% | 0% | 0% | 0.95 |
+| telephony | 55% | 0% | 26% | 18% | 0.74 |
+| realtime_interactive | 96% | 3% | 1% | 0% | 0.95 |
 | multimedia_conferencing | 0% | 100% | 0% | 0% | 1.00 |
-| multimedia_streaming | 96% | 0% | 4% | 0% | 0.91 |
-| standard | 10% | 0% | 89% | 0% | 0.95 |
-| high_throughput_data | 6% | 0% | 94% | 0% | 0.77 |
-| low_priority_data | 2% | 0% | 27% | 71% | 0.78 |
+| multimedia_streaming | 0% | 0% | 100% | 0% | 0.91 |
+| standard | 1% | 0% | 99% | 0% | 0.95 |
+| high_throughput_data | 0% | 0% | 100% | 0% | 0.77 |
+| low_priority_data | 0% | 0% | 29% | 71% | 0.78 |
 
 ## Has the model learned the lab?
 
@@ -125,10 +125,10 @@ LightGBM trained without each source in turn, then scored on that source's flows
 | Source left out | Flows | Damage by class on that source |
 | --- | --- | --- |
 | iscx-tor-nontor-2016 | 1591 | standard 0.00 (1591) |
-| iscx-vpn-nonvpn-2016 | 273 | high_throughput_data 2.23 (23), multimedia_streaming 0.10 (5), standard 0.91 (229), telephony 0.00 (16) |
-| labayen-2020 | 831 | high_throughput_data 0.50 (6), multimedia_streaming 0.06 (13), standard 0.03 (812) |
+| iscx-vpn-nonvpn-2016 | 273 | high_throughput_data 2.23 (23), multimedia_streaming 0.50 (5), standard 0.92 (229), telephony 0.00 (16) |
+| labayen-2020 | 831 | high_throughput_data 0.03 (6), multimedia_streaming 0.48 (13), standard 0.09 (812) |
 | own-captures | 3 | realtime_interactive 0.80 (3) |
 | purdue-vca-2026 | 437 | multimedia_conferencing 1.63 (437) |
 | testbed | | Skipped: a class would have no data left without this source |
-| unsw-cloud-gaming-2025 | 97 | realtime_interactive 1.95 (97) |
+| unsw-cloud-gaming-2025 | 97 | realtime_interactive 2.13 (97) |
 

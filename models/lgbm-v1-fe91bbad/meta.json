@@ -68,19 +68,19 @@
   "calibration": "sigmoid",
   "calibrations_tried": {
     "sigmoid": {
-      "expected_damage_balanced": 0.07508138924269382,
-      "expected_damage": 0.033528638455202965,
+      "expected_damage_balanced": 0.14098097364278356,
+      "expected_damage": 0.036456889381760234,
       "accuracy": 0.9440701638167125,
       "macro_f1": 0.7350659180425418,
       "ece": 0.05224549141567647,
       "damage_by_class": {
         "telephony": 0.0,
-        "realtime_interactive": 0.0,
+        "realtime_interactive": 0.022522522522522324,
         "multimedia_conferencing": 0.00902934537246187,
-        "multimedia_streaming": 0.0217391304347826,
+        "multimedia_streaming": 0.5,
         "standard": 0.024621878297574604,
-        "high_throughput_data": 0.030891691826165586,
-        "low_priority_data": 0.4392876787678721
+        "high_throughput_data": 0.0,
+        "low_priority_data": 0.43069306930692614
       },
       "recall": {
         "telephony": 0.7368421052631597,
@@ -102,19 +102,19 @@
       }
     },
     "isotonic": {
-      "expected_damage_balanced": 0.0815091974779424,
-      "expected_damage": 0.03115980228187699,
+      "expected_damage_balanced": 0.14979518168368505,
+      "expected_damage": 0.034594113230101226,
       "accuracy": 0.9377350436123697,
       "macro_f1": 0.7168257004495728,
       "ece": 0.03260096851001617,
       "damage_by_class": {
         "telephony": 0.0,
-        "realtime_interactive": 0.051597051597051115,
-        "multimedia_conferencing": 0.009075102190227724,
-        "multimedia_streaming": 0.0217391304347826,
+        "realtime_interactive": 0.08913458913458834,
+        "multimedia_conferencing": 0.009090354462816343,
+        "multimedia_streaming": 0.5,
         "standard": 0.019648258881464535,
-        "high_throughput_data": 0.030386027360887437,
-        "low_priority_data": 0.4381188118811834
+        "high_throughput_data": 0.0,
+        "low_priority_data": 0.43069306930692614
       },
       "recall": {
         "telephony": 0.6842105263157912,
@@ -136,19 +136,19 @@
       }
     },
     "temperature": {
-      "expected_damage_balanced": 0.08190570046724278,
-      "expected_damage": 0.025825776382653525,
+      "expected_damage_balanced": 0.14753889317586882,
+      "expected_damage": 0.02956962792005972,
       "accuracy": 0.9715255922919241,
       "macro_f1": 0.7841814501986873,
       "ece": 0.03291355765070583,
       "damage_by_class": {
         "telephony": 0.0,
-        "realtime_interactive": 0.0,
+        "realtime_interactive": 0.04299754299754261,
         "multimedia_conferencing": 0.00902934537246187,
-        "multimedia_streaming": 0.0683229813664596,
+        "multimedia_streaming": 0.5,
         "standard": 0.014773126978544765,
-        "high_throughput_data": 0.08883860482590725,
-        "low_priority_data": 0.39237584472732606
+        "high_throughput_data": 0.07877280265339896,
+        "low_priority_data": 0.38719943422913367
       },
       "recall": {
         "telephony": 0.3421052631578956,
@@ -171,19 +171,19 @@
     }
   },
   "uncalibrated": {
-    "expected_damage_balanced": 0.07180217589567064,
-    "expected_damage": 0.023292491514366284,
+    "expected_damage_balanced": 0.1392552546842918,
+    "expected_damage": 0.026749259196585724,
     "accuracy": 0.9715255922919241,
     "macro_f1": 0.7841814501986873,
     "ece": 0.057473788080652025,
     "damage_by_class": {
       "telephony": 0.0,
-      "realtime_interactive": 0.0,
+      "realtime_interactive": 0.04402129402129362,
       "multimedia_conferencing": 0.00902934537246187,
-      "multimedia_streaming": 0.0248447204968944,
+      "multimedia_streaming": 0.5,
       "standard": 0.012310939148787307,
-      "high_throughput_data": 0.04867248619183463,
-      "low_priority_data": 0.4077577400597163
+      "high_throughput_data": 0.007462686567164113,
+      "low_priority_data": 0.40196251768033564
     },
     "recall": {
       "telephony": 0.3421052631578956,
@@ -212,7 +212,7 @@
       "colsample_bytree": 1.0,
       "reg_lambda": 0.0,
       "trees": 46,
-      "expected_damage_balanced": 0.08802454827061693
+      "expected_damage_balanced": 0.15671052663733948
     },
     {
       "num_leaves": 15,
@@ -221,7 +221,7 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 0.0,
       "trees": 34,
-      "expected_damage_balanced": 0.07724701396045706
+      "expected_damage_balanced": 0.15918785593760618
     },
     {
       "num_leaves": 127,
@@ -230,7 +230,7 @@
       "colsample_bytree": 1.0,
       "reg_lambda": 0.0,
       "trees": 37,
-      "expected_damage_balanced": 0.07180217589567064
+      "expected_damage_balanced": 0.1392552546842918
     },
     {
       "num_leaves": 31,
@@ -239,7 +239,7 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 0.0,
       "trees": 57,
-      "expected_damage_balanced": 0.08460936543299402
+      "expected_damage_balanced": 0.156730917493509
     },
     {
       "num_leaves": 127,
@@ -248,7 +248,7 @@
       "colsample_bytree": 0.8,
       "reg_lambda": 5.0,
       "trees": 25,
-      "expected_damage_balanced": 0.07292187712288527
+      "expected_damage_balanced": 0.15387688140043482
     },
     {
       "num_leaves": 31,
@@ -257,7 +257,7 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 0.0,
       "trees": 62,
-      "expected_damage_balanced": 0.0796831596913506
+      "expected_damage_balanced": 0.15871794348636883
     },
     {
       "num_leaves": 15,
@@ -266,7 +266,7 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 1.0,
       "trees": 80,
-      "expected_damage_balanced": 0.07247738011380345
+      "expected_damage_balanced": 0.15444878084079244
     },
     {
       "num_leaves": 31,
@@ -275,7 +275,7 @@
       "colsample_bytree": 0.8,
       "reg_lambda": 0.0,
       "trees": 21,
-      "expected_damage_balanced": 0.09626111847584966
+      "expected_damage_balanced": 0.16180262671399728
     },
     {
       "num_leaves": 15,
@@ -284,7 +284,7 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 1.0,
       "trees": 33,
-      "expected_damage_balanced": 0.07846349950121648
+      "expected_damage_balanced": 0.1627418980053728
     },
     {
       "num_leaves": 31,
@@ -293,7 +293,7 @@
       "colsample_bytree": 1.0,
       "reg_lambda": 5.0,
       "trees": 88,
-      "expected_damage_balanced": 0.08620879188923877
+      "expected_damage_balanced": 0.16093961194265602
     },
     {
       "num_leaves": 15,
@@ -302,7 +302,7 @@
       "colsample_bytree": 0.8,
       "reg_lambda": 5.0,
       "trees": 28,
-      "expected_damage_balanced": 0.08107369595748255
+      "expected_damage_balanced": 0.1688768542327978
     },
     {
       "num_leaves": 31,
@@ -311,24 +311,24 @@
       "colsample_bytree": 0.6,
       "reg_lambda": 5.0,
       "trees": 29,
-      "expected_damage_balanced": 0.08346916731623945
+      "expected_damage_balanced": 0.1608942967648484
     }
   ],
-  "fit_s": 46.4,
-  "single_record_us": 1293.5,
+  "fit_s": 117.4,
+  "single_record_us": 1433.7,
   "validation": {
     "rows": 43188,
     "flows": 3607,
-    "expected_damage": 0.033528638455202965,
-    "expected_damage_balanced": 0.07508138924269382,
+    "expected_damage": 0.036456889381760234,
+    "expected_damage_balanced": 0.14098097364278356,
     "damage_by_class": {
       "telephony": 0.0,
-      "realtime_interactive": 0.0,
+      "realtime_interactive": 0.022522522522522324,
       "multimedia_conferencing": 0.00902934537246187,
-      "multimedia_streaming": 0.0217391304347826,
+      "multimedia_streaming": 0.5,
       "standard": 0.024621878297574604,
-      "high_throughput_data": 0.030891691826165586,
-      "low_priority_data": 0.4392876787678721
+      "high_throughput_data": 0.0,
+      "low_priority_data": 0.43069306930692614
     },
     "accuracy": 0.9440701638167125,
     "macro_f1": 0.7350659180425418,
@@ -441,36 +441,34 @@
     },
     "tins": {
       "telephony": {
-        "best_effort": 2.5,
-        "voice": 13.0,
+        "best_effort": 5.0,
+        "voice": 10.5,
         "bulk": 3.5
       },
       "realtime_interactive": {
-        "voice": 109.0,
-        "video": 2.0
+        "voice": 106.933,
+        "video": 3.067,
+        "best_effort": 1.0
       },
       "multimedia_conferencing": {
         "video": 441.0,
         "best_effort": 2.0
       },
       "multimedia_streaming": {
-        "voice": 22.0,
-        "best_effort": 1.0
+        "best_effort": 23.0
       },
       "standard": {
-        "voice": 293.388,
-        "best_effort": 2539.612,
+        "best_effort": 2808.5,
+        "voice": 24.5,
         "bulk": 10.0
       },
       "high_throughput_data": {
-        "best_effort": 62.861,
-        "voice": 4.139
+        "best_effort": 67.0
       },
       "low_priority_data": {
         "bulk": 72.048,
         "video": 0.143,
-        "best_effort": 27.073,
-        "voice": 1.736
+        "best_effort": 28.81
       }
     }
   },
@@ -580,5 +578,5 @@
     "lightgbm": "4.7.0",
     "numpy": "2.5.3"
   },
-  "model_bytes": 1492107
+  "model_bytes": 1492110
 }

@@ -2,7 +2,7 @@
 
 A record of what was done, how, why, and what was learned, written so the work can be picked up again and so the case study can be written from it. The [PRD](<Adaptive QoS Engine Product Requirements (Teliport S4).md>) says what and why; the [build plan](<Build Plan and Timeline.md>) says in what order; the [technical specification](<Technical Specification.md>) says how each part is built and, in "As built" notes, how it turned out. This file is the story across all of them.
 
-Last updated: early morning of Oct 12, 2026. Waves 5 and 6 are built, half of wave 7 is, and the first live comparison has been run.
+Last updated: night of Oct 13, 2026. Waves 1 to 7 are built, dataset `v1` is sealed, the model is trained, and the smoke run of every scenario on every core configuration has passed. Sections 3 to 10 below were written on Oct 12 and are kept as they were; section 11 is what happened since and overrides them where they differ.
 
 ## 1. The project in one paragraph
 
@@ -15,13 +15,14 @@ A home router that works out what each connection is (a call, a game, a download
 | 1 | Pinned versions, interface contracts | Done |
 | 2 | Testbed, traffic generators, real-traffic captures | Done; captures became a larger data effort (section 6) |
 | 3 | Baselines and metrics, feature extractor, experiment runner | Done |
-| 4 | Dataset, threshold rules, enforcer, watchdog | Done; dataset `v1` to be sealed once the last downloads land |
-| 5 | Classifier, damage table, decision engine, safety shield, dashboard | Built. The real models wait for dataset `v1`. The damage table is measured with one seed per cell; two more are running. The dashboard is written but not yet seen live |
-| 6 | Controller integration, go/no-go, scenarios | Controller done and working end to end. The go/no-go tool is written and waits for `v1`. Every scenario but S8 is written and has run once on all four configurations |
-| 7 | Reclassifier, verifier, capacity estimator, intent leases | Capacity estimator built and working on S2. Leases built; a lease was requested and granted in a live run, though it changed nothing there. Reclassifier by envelopes and the verifier not started |
-| 8, 9 | Experiments, report | Not started |
+| 4 | Dataset, threshold rules, enforcer, watchdog | Done; dataset `v1` sealed Oct 12 |
+| 5 | Classifier, damage table, decision engine, safety shield, dashboard | Done. Models trained on `v1`, LightGBM chosen. The damage table has two seeds per cell. The dashboard is written but not yet seen live |
+| 6 | Controller integration, go/no-go, scenarios | Done. The go/no-go on `v1` says go. S1 to S8 and S10 all run |
+| 7 | Reclassifier, verifier, capacity estimator, intent leases | Done (section 11) |
+| 8 | Experiments | The smoke gate has passed, 45 of 45 runs valid. The full matrix and the A/A runs are written as matrix files. Ablations and demo not started |
+| 9 | Report | The statistics tool is built. Charts, the written report and slides not started |
 
-Nothing has been committed to git yet. Everything is in the working tree.
+The work is in git from Oct 13 (`main`, not pushed). Datasets, results, binaries and the random forest's model file are left out.
 
 ## 3. Results so far
 
@@ -374,3 +375,50 @@ Where data lives:
 7. Still to build: the reclassifier by class envelopes (7A), the verifier and rollback (7B), S8, and the stretch items.
 
 **Worth a decision from both of you before the report is planned:** the claim (section 8, first item), and whether the generated calls and games should adapt their rate, since every "plain CAKE breaks it" number depends on them not doing so.
+
+## 11. Oct 13: wave 7 finished, the smoke run, and what it changed
+
+**Built.** S8 and the generators' planned changes; the reclassifier by class envelopes (7A); the QoE verifier and rollback (7B); the statistics tool for a matrix (`aqos_ml.report`); matrix files for the smoke gate, the full matrix and the A/A runs; `scripts/watch-matrix.sh` to watch a matrix from a terminal. The details are in the technical specification's "As built" notes for each.
+
+**Dataset `v1` and the go/no-go.** Sealed Oct 12, with the UNSW cloud-gaming table in. LightGBM chosen. On the validation split, with the two-seed damage table and the Voice bar below: balanced expected damage 0.141 against the tuned rules' 0.745 (difference -0.604, interval -0.693 to -0.517). Go. The final test set is still unopened.
+
+**The damage table, second seed.** All 240 cells valid. Scored as before, it said a video call belongs in Bulk: in the narrow-uplink condition two calls share a device, ruining the subject call frees room for the other, and that relief outweighed its own loss. Relief to the others is now credited only to a flow that gives up next to nothing for it (`relief_free: 0.1`). A backup in Bulk still earns it; a call does not. The table now agrees with RFC 4594 in every row except streaming, which it puts in Voice.
+
+**The smoke run: every scenario once on B0, B2, B4, O1, O2.** 45 of 45 valid. One seed, so a first look. Summed cost per scenario, 0 for every flow fine and 1 for each flow unusable:
+
+| Scenario | No QoS | Plain CAKE | Rules | Top label (O1) | Expected damage (O2) |
+| --- | --- | --- | --- | --- | --- |
+| S1 download during a call | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| S2 link drops to a fifth | 1.00 | 1.00 | 1.00 | 0.00 | 0.00 |
+| S3 three TVs and a console | 1.19 | 0.19 | 0.19 | 0.19 | 0.19 |
+| S4 backup during a game | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| S5 work call on a busy evening | 2.19 | 1.19 | 2.23 | 1.19 | 0.20 |
+| S6 call on a laptop sharing files | 1.29 | 1.00 | 1.00 | 0.49 | 0.03 |
+| S7 cloud game during an update | 1.13 | 1.12 | 1.12 | 0.12 | 0.12 |
+| S8 flows that change | 2.16 | 1.12 | 0.74 | 0.12 | 0.12 |
+| S10 probes silent, controller killed | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| All nine | 11.96 | 4.62 | 5.28 | 2.11 | 0.66 |
+
+The full system is never worse than plain CAKE and better in five of nine scenarios; in the other four every method ties, as the damage measurements predicted. The threshold rules are worse than plain CAKE overall. For the first time expected damage beats top label on live traffic, in S5 and S6. The O2 column is the second attempt; see next.
+
+**O2 lost S7 on the first attempt, and why.** The game had 51% of its frames late under O2 and 1% under O1. The measured table's Voice column is nearly all zeros: each kind of flow was measured there alone, found harmless, and so the table cannot say what happens when all of them are sent there together. O2 put a stream and a flow it called "ordinary web traffic (54%)" in Voice beside the game; together they outgrew Voice's quarter of the link. The engine now needs to be over 50% sure a flow is a call or a game before Voice is allowed (`voice_bar`), the mirror of the bar on Bulk. With it O2 matches O1 on S7 and beats it on S5, where the streams had also gone to Voice. On paper the bar costs score (0.141 against 0.075 offline), because the table itself rewards Voice. This is the third time a scenario found a gap in the table; the earlier runs are kept in `results-smoke-before-voice-bar/`.
+
+**S5 under O1: one flow under the bar.** The backup's two connections were both called background transfers, one at 85% and one at 70%. Top label demotes only above 80%, so one stayed in Best Effort and took the upload the call needed. O2 demoted both, because for it the question is the expected damage, not one threshold. The first live run had both above the bar with the draft model, which is why O1 won S5 then.
+
+**The estimator and silent probes: decided.** With fewer than two reflectors answering it now leaves the rates where they are. S10 costs nothing under O1 and O2 any more (it cost 1.19 in the first live run). `aqosd -deaf minimum` gives the old behaviour back.
+
+**Envelopes fit unchanged flows badly.** Checked against the range of their own true class, 38% of validation video-call flows and 48% of game flows would be sent back to the classifier at least once though nothing changed (`reports/envelopes-v1.md`). A back-off was added: a flow that stays outside is asked about after 5 s, then 10, up to 40. In a live S8 run 5,378 window records led to 161 questions.
+
+**S8 does not stress the reclassifier.** Camera off leaves the call in Video; the game is in Voice in the lobby and in the match; the paused download sends nothing to look at. The relabels in S8 are the reclassifier correcting first labels (a file-sharing UDP flow called a voice call, moved to Bulk 2.3 s later). A scenario where the right tin changes is still to be written.
+
+**The verifier in real runs.** Judged up to 31 changes per run; rolled back a rate raise in S7 after the Voice and Video tin delay rose from 26 ms to 104 and 67 ms. No sign of it undoing a good promotion, but one seed says little; the A/A runs are what will.
+
+**Mistakes, added.**
+- `pkill -f` and `pgrep -f` with a pattern that matched the shell running them. Twice more.
+- Python's output is buffered when it goes to a file: a matrix's log stayed empty for hours. `python -u`, or watch the result directories.
+- A test wrote `voice_bar=0.0` to mean "no bar"; the comparison is "not above the bar", so zero still bars everything with no probability.
+
+**Still open.**
+- The damage table keeps being wrong about what it did not measure. Three gaps found by scenarios so far (no reward for demotion; a call sacrificed for another; Voice as free). The report must say the table is a model of what matters and show these.
+- O1's 80% bar and the model's calibrated 70% for an upload's first packets: top label is fragile wherever one flow sits near the bar.
+- No own video-call capture in the final test; the dashboard has not been seen live; no charts (matplotlib is not installed).

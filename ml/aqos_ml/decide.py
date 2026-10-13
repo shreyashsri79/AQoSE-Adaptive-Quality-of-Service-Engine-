@@ -50,10 +50,11 @@ class Engine:
     belongs in Bulk before it puts it there. lease_multiplier scales the
     damage of leaving a leased interactive class in Best Effort or Bulk.
     tie_margin is how close two tins' expected damages must be to count as
-    equal."""
+    equal. voice_bar is how sure the engine must be that a flow is a call
+    or a game before it puts it in Voice."""
 
     def __init__(self, damage, mode="expected_damage", demotion_bar=0.8, lease_multiplier=5.0, rule_name=None,
-                 tie_margin=0.05):
+                 tie_margin=0.05, voice_bar=0.5):
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}, not {mode!r}")
         self.damage, self.mode = damage, mode
@@ -65,6 +66,15 @@ class Engine:
         # is rounded to half a point, so smaller differences are arithmetic,
         # not measurement.
         self.tie_margin = tie_margin
+        # Voice has priority over everything up to a quarter of the link.
+        # The damage table measured each kind of flow there alone, found
+        # that nearly all of them do no harm, and so cannot say what
+        # happens when all of them are sent there together: in the smoke
+        # runs a stream and a cloud game shared Voice, outgrew its quarter
+        # and the game lost half its frames. Like Bulk, Voice needs
+        # evidence: the flow is probably one of the classes Voice is for.
+        self.voice_bar = voice_bar
+        self._voice_classes = [c for c in CLASSES if TAXONOMY["classes"][c]["tin"] == "voice"]
         # The classes whose least damaging tin is Bulk according to the
         # table. In top-label mode it is the taxonomy that says so.
         self._bulk_classes = {
@@ -99,8 +109,11 @@ class Engine:
         if self.mode == "top_label":
             tin = TAXONOMY["classes"][top]["tin"]
         else:
-            lowest = min(expected.values())
-            tied = [t for t in TINS if expected[t] - lowest <= self.tie_margin]
+            allowed = list(TINS)
+            if sum(probs[c] for c in self._voice_classes) <= self.voice_bar:
+                allowed.remove("voice")
+            lowest = min(expected[t] for t in allowed)
+            tied = [t for t in allowed if expected[t] - lowest <= self.tie_margin]
             own = TAXONOMY["classes"][top]["tin"]
             tin = own if own in tied and own != "bulk" else min(tied, key=_TIE_ORDER.get)
         held = tin == "bulk" and sum(probs[c] for c in self._bulk_classes) <= self.demotion_bar
@@ -148,6 +161,9 @@ class Engine:
                      " so it stays in Best Effort.")
         elif self.mode == "top_label":
             text += f"; {TIN_NAME[tin]} is the tin for that class."
+        elif tin != "voice" and expected["voice"] < expected[tin] - self.tie_margin:
+            text += (f"; not sure enough that it is a call or a game to put it in Voice (needs over"
+                     f" {self.voice_bar:.0%}), so {TIN_NAME[tin]}, the next lowest expected damage.")
         elif tin == top_tin:
             text += f"; the {TIN_NAME[tin]} tin has the lowest expected damage."
         else:

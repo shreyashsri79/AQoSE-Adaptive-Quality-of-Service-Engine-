@@ -84,7 +84,20 @@ def test_a_tie_follows_the_taxonomy_but_never_into_bulk():
     assert decide.Engine(nearly).tin(classification(standard=1.0)) == "best_effort"
     # A real difference wins over the taxonomy.
     real = {cls: {"voice": 0.0, "video": 2.0, "best_effort": 2.0, "bulk": 9.0} for cls in evaluate.CLASSES}
-    assert decide.Engine(real).tin(classification(multimedia_streaming=1.0)) == "voice"
+    assert decide.Engine(real).tin(classification(realtime_interactive=1.0)) == "voice"
+
+
+def test_voice_needs_a_call_or_a_game():
+    """A table that says Voice harms nothing must not send everything
+    there: Voice is a quarter of the link."""
+    free = {cls: {"voice": 0.0, "video": 1.0, "best_effort": 2.0, "bulk": 9.0} for cls in evaluate.CLASSES}
+    engine = decide.Engine(free)
+    assert engine.tin(classification(multimedia_streaming=1.0)) == "video"
+    assert engine.tin(classification(standard=0.55, telephony=0.45)) == "video"
+    assert engine.tin(classification(standard=0.4, telephony=0.35, realtime_interactive=0.25)) == "voice"
+    proposal = engine.propose(classification(multimedia_streaming=1.0), "a1b2c3d4e5f60718")
+    assert "not sure enough that it is a call or a game" in proposal["reason"]
+    assert decide.Engine(free, voice_bar=-1).tin(classification(multimedia_streaming=1.0)) == "voice"
 
 
 def test_lease_changes_the_table_not_the_probabilities():
