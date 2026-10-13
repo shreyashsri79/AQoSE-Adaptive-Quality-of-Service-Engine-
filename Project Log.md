@@ -397,7 +397,7 @@ Where data lives:
 | S7 cloud game during an update | 1.13 | 1.12 | 1.12 | 0.12 | 0.12 |
 | S8 flows that change | 2.16 | 1.12 | 0.74 | 0.12 | 0.12 |
 | S10 probes silent, controller killed | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| All nine | 11.96 | 4.62 | 5.28 | 2.11 | 0.66 |
+| All nine | 11.96 | 5.61 | 6.28 | 2.11 | 0.66 |
 
 The full system is never worse than plain CAKE and better in five of nine scenarios; in the other four every method ties, as the damage measurements predicted. The threshold rules are worse than plain CAKE overall. For the first time expected damage beats top label on live traffic, in S5 and S6. The O2 column is the second attempt; see next.
 

@@ -48,7 +48,14 @@ def collect(results):
             continue
         run_dir = manifest_path.parent
         doc = yaml.safe_load((run_dir / "scenario.yaml").read_text())
-        measured = {"entries": damage.measure_entries(run_dir)}
+        # Reducing a run means reading every packet's latency sample. A
+        # finished run never changes, so the reduction is kept beside it.
+        kept = run_dir / "measured.json"
+        if kept.exists():
+            measured = {"entries": json.loads(kept.read_text())}
+        else:
+            measured = {"entries": damage.measure_entries(run_dir)}
+            kept.write_text(json.dumps(measured["entries"]) + "\n")
         report = run_dir / "controller.json"
         measured["controller"] = json.loads(report.read_text()) if report.exists() else None
         measured["name"] = doc["name"]
