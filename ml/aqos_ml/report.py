@@ -68,6 +68,7 @@ def reduce(results, scoring):
         for config, run in by_config.items():
             out[scenario][config][seed] = reduce_run(run["entries"], scoring, usual)
             out[scenario][config][seed]["_controller"] = run.get("controller")
+            out[scenario][config][seed]["_cpu"] = run.get("cpu")
             names[scenario] = run["name"]
     return out, names
 
@@ -154,6 +155,33 @@ def _cell(c, digits=2):
     return text
 
 
+def cpu_table(runs, order, configs, names):
+    """CPU per component: the share of one core each part used over the
+    run, mean over seeds. Runs from before CPU was recorded are left out."""
+    rows = []
+    for s in order:
+        for c in configs:
+            per = defaultdict(list)
+            for m in runs[s].get(c, {}).values():
+                seconds = m.get("_seconds") or 200
+                for part, cpu in (m.get("_cpu") or {}).items():
+                    per[part].append(100 * cpu / seconds)
+                ctl = m.get("_controller") or {}
+                if "cpu_s" in ctl:
+                    per["controller"].append(100 * ctl["cpu_s"] / seconds)
+            if per:
+                rows.append((s, c, {p: float(np.mean(v)) for p, v in per.items()}))
+    if not rows:
+        return []
+    parts = sorted({p for _, _, d in rows for p in d})
+    lines = ["## CPU per component, % of one core over the run", "",
+             "| Scenario | Configuration | " + " | ".join(parts) + " |", "| --- | --- |" + " --- |" * len(parts)]
+    for s, c, d in rows:
+        lines.append(f"| {s} | {c} | " + " | ".join(_num(d.get(p), 2) for p in parts) + " |")
+    return lines + ["", "Measured on the reference laptop (12th-gen Intel i5, 16 threads), so a router's figures will "
+                         "be several times higher. The ML service is the Go service for O1 and O2 and Python for B4.", ""]
+
+
 def markdown(results, aa=None, scoring_path=None, seed=1):
     scoring = yaml.safe_load(Path(scoring_path or damage.SCORING).read_text())
     rng = np.random.default_rng(seed)
@@ -231,6 +259,7 @@ def markdown(results, aa=None, scoring_path=None, seed=1):
                 lines.append(f"| {s} | {c} | " + " | ".join(_num(np.mean([r.get(k, 0) for r in reports]), 1)
                                                                for k in counted) + " |")
     lines.append("")
+    lines += cpu_table(runs, order, configs, names)
     if bands:
         lines += ["## Noise between identical runs", "", "| Scenario | Summed cost, 95th percentile of the difference |",
                   "| --- | --- |", *[f"| {s} | {_num(bands[s].get(COST), 3)} |" for s in order if s in bands], ""]

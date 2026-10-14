@@ -58,6 +58,8 @@ def collect(results):
             kept.write_text(json.dumps(measured["entries"]) + "\n")
         report = run_dir / "controller.json"
         measured["controller"] = json.loads(report.read_text()) if report.exists() else None
+        cpu = run_dir / "cpu.json"
+        measured["cpu"] = json.loads(cpu.read_text()) if cpu.exists() else None
         measured["name"] = doc["name"]
         runs[manifest["scenario_id"], manifest["seed"]][manifest["config"]] = measured
     return runs

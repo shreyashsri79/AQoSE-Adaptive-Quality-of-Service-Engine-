@@ -25,4 +25,5 @@ echo "== reports $(date '+%a %H:%M')"
 .venv/bin/python -m aqos_ml.report --results results-final --aa results-aa --out reports/final.md
 .venv/bin/python -m aqos_ml.report --results results-fresh --out reports/fresh.md
 .venv/bin/python -m aqos_ml.charts --results results-final --aa results-aa --out reports/charts
+.venv/bin/python -m aqos_ml.ablation > /dev/null
 echo "== done $(date '+%a %H:%M')"
