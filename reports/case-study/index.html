@@ -310,6 +310,28 @@ flowchart LR
     </table>
   </div>
   <p class="meta">The rules' recall is measured against the class whose tin they choose; they have three outputs, not seven, which is why their macro-F1 is so low. Their damage is the fairer comparison.</p>
+  <h3>Random forest or gradient-boosted trees</h3>
+  <p>Two models were trained on the same training split, calibrated on the same calibration split and judged on the same 3,607 validation flows: a random forest (scikit-learn) and gradient-boosted trees (LightGBM). Both are tree ensembles, because the input is 28 numbers per flow and the model has to answer on a router's CPU within a 50 ms deadline, with no GPU. The rule for choosing was fixed before training: the lower balanced expected damage on validation wins.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th class="n">Random forest</th><th class="n ours">LightGBM</th></tr></thead>
+      <tbody>
+        <tr><td>Settings</td><td class="n">300 trees, depth up to 24</td><td class="n ours">37 trees, 127 leaves each</td></tr>
+        <tr><td>How the settings were found</td><td class="n">fixed</td><td class="n ours">12 tried, best on validation</td></tr>
+        <tr><td>Calibration (chosen by expected damage)</td><td class="n">isotonic</td><td class="n ours">sigmoid</td></tr>
+        <tr><td>Balanced expected damage, expected-damage rule</td><td class="n">0.146</td><td class="n ours">0.141</td></tr>
+        <tr><td>Balanced expected damage, top-label rule</td><td class="n">0.279</td><td class="n ours">0.294</td></tr>
+        <tr><td>Accuracy</td><td class="n">0.942</td><td class="n ours">0.944</td></tr>
+        <tr><td>Macro-F1</td><td class="n">0.719</td><td class="n ours">0.735</td></tr>
+        <tr><td>Calibration error (lower is better)</td><td class="n">0.025</td><td class="n ours">0.052</td></tr>
+        <tr><td>Time to classify one flow</td><td class="n">13.5 ms</td><td class="n ours">1.4 ms</td></tr>
+        <tr><td>Model size</td><td class="n">11.7 MB</td><td class="n ours">1.5 MB</td></tr>
+        <tr><td>Training time</td><td class="n">47 s</td><td class="n ours">117 s, search included</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>On accuracy and damage the two are a tie: 0.005 apart, where the uncertainty on either is about ten times that. The random forest is better calibrated, and does slightly better under the top-label rule. LightGBM won the pre-set rule by a hair, and that hair is not why it is the right choice. It answers in a tenth of the time and is an eighth of the size, which leaves most of the 50 ms deadline free when many flows start at once, and fits on a router with little memory. Had the forest won by the same margin, the speed and size would still have argued for LightGBM.</p>
+  <p class="meta">Within the training sources LightGBM fits closely: accuracy 0.991 on the training split against 0.944 on validation, macro-F1 0.93 against 0.74. Its settings were chosen on validation, so validation is somewhat optimistic; the sealed test set is the honest check.</p>
   <h3>Leave one source out</h3>
   <p>Trained without one data source and tested on that source alone, the model does much worse on it. This is the largest risk on the machine-learning side: within a source the model is excellent, across sources it is not yet.</p>
   <div class="table-wrap">
@@ -327,6 +349,19 @@ flowchart LR
     </table>
   </div>
   <p class="meta">With every source in training, the same classes score 0.00 to 0.03. The testbed source cannot be left out: some classes would have no training data at all.</p>
+  <h3>Where traffic it has never seen ends up</h3>
+  <p>A wrong label is not the same as a wrong tin. Calling a video call a voice call is harmless, since both are protected. The mistakes that hurt are a call or a game put in Bulk, or left in Best Effort beside bulk traffic on the same device. So the question for unseen traffic is where it is placed.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Unseen traffic</th><th class="n">Labelled right</th><th class="n">Voice or Video</th><th class="n">Best Effort</th><th class="n">Bulk</th></tr></thead>
+      <tbody>
+        <tr><td>Six WhatsApp calls, 3 voice and 3 video, recorded Oct 14 on a home line</td><td class="n">50%</td><td class="n ours">100%</td><td class="n">0%</td><td class="n">0%</td></tr>
+        <tr><td>Zoom, Meet, Teams, Webex calls, model trained without them</td><td class="n">0%</td><td class="n ours">75%</td><td class="n">9%</td><td class="n loss">16%</td></tr>
+        <tr><td>Cloud gaming on four platforms, model trained without it</td><td class="n">16%</td><td class="n ours">18%</td><td class="n">81%</td><td class="n">2%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Share of each flow's records, by where the full system's decision rule placed them. The WhatsApp video calls were labelled "voice call" on every record and still went to Voice or Video every time. Unseen cloud gaming mostly fell back to Best Effort, which is where plain CAKE would have left it. The weakness is the 16% of unseen video-call records sent to Bulk: there the model was confidently wrong, above the 80% bar for demotion, so the bar did not catch it. Demotion to Bulk therefore needs evidence besides the model's confidence, and that is the next change to the decision rule.</p>
   <figure>
     <img src="charts/damage-table.png" alt="Heatmap of the measured damage table: seven traffic classes by four tins." width="1056" height="736" loading="lazy">
     <figcaption>The measured damage table the decision engine reads. A game in Bulk costs 6; a download in Video costs 4.5 because it hurts the calls beside it; a background transfer belongs in Bulk because anywhere else it takes upload a call needs.</figcaption>
@@ -351,7 +386,7 @@ flowchart LR
   <h2>What these numbers do not show</h2>
   <ul class="plain">
     <li><strong>Generated calls and games do not adapt their bitrate.</strong> Short of bandwidth, a real app lowers its quality; ours lose packets. "Plain CAKE breaks the call" is true, but how badly is the generator's.</li>
-    <li><strong>The model has partly learned the lab.</strong> Tested on a data source it never saw, it does much worse (the leave-one-source-out table above). More sources per class is the remedy; six WhatsApp calls recorded this week are a start.</li>
+    <li><strong>The model has partly learned the lab.</strong> On a data source it never saw, its labels are often wrong. Its placements mostly stay safe, but 16% of unseen video-call records went to Bulk (the tables above). The remedies are a decision rule that will not demote on confidence alone, and more sources per class; six WhatsApp calls recorded this week are a start.</li>
     <li><strong>Self-graded metric.</strong> The cost scale is the one the damage table, and so the decision engine, is built from. The raw measurements table is the evidence; the cost is a summary of it.</li>
     <li><strong>Six seeds.</strong> A bootstrap interval from six pairs is unstable, and the smallest possible Wilcoxon p-value with six pairs is 0.031. Ten seeds and the A/A noise band come next.</li>
     <li><strong>Not yet measured:</strong> CPU per component at 25, 50 and 100 Mbit/s; a flood of short flows (S9); fairness between devices; IPv6 traffic end to end (the marking is tested on IPv6, the scenarios run on IPv4); traffic inside a VPN.</li>
