@@ -436,3 +436,20 @@ A review of the interim page (six seeds) raised points that hold whatever the se
 7. **Statistics on six seeds** are unstable; ten seeds, Wilcoxon with Holm, and the A/A band on every chart.
 
 Also missing against the judging criteria: CPU per component at 25, 50 and 100 Mbit/s; S9; fairness and starvation evidence; IPv6 end to end; the VPN case. Done today: classifier accuracy, macro-F1, per-class recall and calibration error on the page; a sensitivity check of the damage table (`python -m aqos_ml.sensitivity`, `reports/sensitivity-v1.md`): scaling every cell by 0.75 to 1.25 moves at most 2.1% of placements, but moving every cell by up to one point moves up to 39%, because the many zero cells are where the table is weakest.
+
+## 13. Run plan to Oct 16 (deadline for submission: Oct 23)
+
+Engineering is to finish by the evening of Fri Oct 16, so the writing team has a week with final numbers. Worked through autonomously; each step is ticked here when done.
+
+- [ ] Offline, while the matrix runs: demotion to Bulk needs evidence besides the model's confidence, tested on held-out sources (the 16% of unseen video-call records sent to Bulk)
+- [ ] Offline: trees, calibration and decision rule ported to Go, with an equivalence test against the Python service on every dataset record
+- [ ] Offline: dataset v2 with the six WhatsApp calls; retrain; go/no-go
+- [ ] Offline: cake-autorate set up as B3 (time-boxed to 2 h; if it will not run rootless, a stated limit)
+- [ ] Offline: one new scenario written for the post-freeze run, not run before the freeze
+- [ ] Matrix (`results-core`) finishes, about Thu 02:30; A/A runs (`results-aa`) about Thu 07:45
+- [ ] Freeze: one commit with everything; 15-minute smoke check of the frozen system
+- [ ] Combined run, about 23 h: O1 and O2 on seeds 0-9 (they replace the pre-freeze ones; B0, B2, B4 are unaffected and kept), B2/B4/O1/O2 on fresh seeds 10-14, B3 on S2 and S5, the new scenario once
+- [ ] Weakened-classifier ablation; CPU per component
+- [ ] Open the sealed test set once; final report, charts, case study page and handover marked final; push notification to the owner
+
+Cut, to be stated as limits: adaptive call generator, real router, S9, fairness index, IPv6 and VPN scenarios, dashboard and demo.
