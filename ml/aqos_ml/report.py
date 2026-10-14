@@ -36,7 +36,7 @@ from . import damage
 from .run import table
 
 KEY = [("O2", "B4"), ("O2", "O1")]
-OTHERS = [("O2", "B2"), ("O1", "B2"), ("B4", "B2"), ("B2", "B0")]
+OTHERS = [("O2", "B2"), ("O2", "B3"), ("O1", "B2"), ("B4", "B2"), ("B3", "B2"), ("B2", "B0")]
 RESAMPLES = 10_000
 COST = "summed cost"
 

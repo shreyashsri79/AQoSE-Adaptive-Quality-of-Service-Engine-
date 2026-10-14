@@ -30,10 +30,12 @@ from . import damage, report  # noqa: E402
 REPO = Path(__file__).resolve().parents[2]
 # One colour per configuration, the same in every chart. No QoS is grey:
 # it is the backdrop, not a rival.
-COLOR = {"B0": "#898781", "B2": "#2a78d6", "B4": "#eb6834", "O1": "#1baf7a", "O2": "#6250d6"}
+COLOR = {"B0": "#898781", "B2": "#2a78d6", "B4": "#eb6834", "O1": "#1baf7a", "O2": "#6250d6",
+         # Last in every order: green beside orange fails for colour-blind readers.
+         "B3": "#008300"}
 NAME = {"B0": "No QoS", "B2": "Plain CAKE", "B4": "CAKE + threshold rules",
-        "O1": "Classifier, top label", "O2": "Classifier, expected damage"}
-SHORT = {"B0": "No QoS", "B2": "CAKE", "B4": "Rules", "O1": "Top label", "O2": "Full system"}
+        "O1": "Classifier, top label", "O2": "Classifier, expected damage", "B3": "CAKE + cake-autorate"}
+SHORT = {"B0": "No QoS", "B2": "CAKE", "B4": "Rules", "O1": "Top label", "O2": "Full system", "B3": "Autorate"}
 SURFACE, INK, SECONDARY, MUTED, AXIS, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#898781", "#c3c2b7", "#ebeae5"
 BLUES = ["#fcfcfb", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#104281"]
 
@@ -90,7 +92,10 @@ def _bars(ax, labels, values, colors, lows=None, highs=None, digits=2, limit=Non
 
 
 def total_cost(runs, configs, order, out, rng):
-    """Damage per seed summed over the scenarios, then the median over seeds."""
+    """Damage per seed summed over the scenarios, then the median over seeds.
+    Only configurations run on every scenario: a total over fewer would
+    not compare."""
+    configs = [c for c in configs if all(c in runs[s] for s in order)]
     seeds = sorted(set.intersection(*[set(runs[s][c]) for s in order for c in configs if c in runs[s]]))
     values, lows, highs = [], [], []
     for c in configs:
@@ -162,7 +167,7 @@ def late_frames(runs, names, configs, order, out, rng):
 
 def against(runs, configs, order, out, rng, bands):
     """The full system minus each rival, paired by seed: left of zero is better."""
-    rivals = [c for c in ("B2", "B4", "O1") if c in configs]
+    rivals = [c for c in ("B2", "B4", "O1", "B3") if c in configs]
     if "O2" not in configs or not rivals:
         return None
     fig, axes = plt.subplots(1, len(rivals), figsize=(3.9 * len(rivals), 0.42 * len(order) + 1.9), sharey=True,
@@ -349,7 +354,7 @@ def main(argv=None):
     runs, names = report.reduce(args.results, scoring)
     bands = report.noise_bands(report.reduce(args.aa, scoring)[0], runs) if args.aa else {}
     order = sorted(runs, key=lambda s: int(s[1:]))
-    configs = [c for c in ("B0", "B2", "B4", "O1", "O2") if any(c in runs[s] for s in order)]
+    configs = [c for c in ("B0", "B2", "B4", "O1", "O2", "B3") if any(c in runs[s] for s in order)]
     written = [
         total_cost(runs, configs, order, out, rng),
         cost_by_scenario(runs, names, configs, order, out, rng),

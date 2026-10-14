@@ -2,7 +2,7 @@ from aqos_ml import charts
 
 
 def test_every_configuration_has_its_own_colour_and_name():
-    assert len(set(charts.COLOR.values())) == len(charts.COLOR) == 5
+    assert len(set(charts.COLOR.values())) == len(charts.COLOR) == 6
     assert set(charts.COLOR) == set(charts.NAME) == set(charts.SHORT)
 
 

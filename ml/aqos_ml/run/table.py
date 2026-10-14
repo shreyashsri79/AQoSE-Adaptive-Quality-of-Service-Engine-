@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-ORDER = ["B0", "B2", "B4", "O1", "O2"]
+ORDER = ["B0", "B2", "B4", "O1", "O2", "B3"]
 USUAL = "B2"
 
 
