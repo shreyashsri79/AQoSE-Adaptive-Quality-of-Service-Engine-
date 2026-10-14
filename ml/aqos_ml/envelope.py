@@ -130,7 +130,7 @@ def cases(envelopes):
     return out
 
 
-def chosen_envelopes(dataset_name="v1"):
+def chosen_envelopes(dataset_name="v2"):
     version = (MODELS / f"chosen-{dataset_name}.txt").read_text().strip()
     return version, json.loads((MODELS / version / "envelopes.json").read_text())
 

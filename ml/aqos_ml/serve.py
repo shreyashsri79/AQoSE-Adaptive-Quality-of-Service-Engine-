@@ -62,6 +62,35 @@ class Service:
         return {"id": request["id"], "ok": True, "model_version": self.classifier.model_version,
                 "decision_rule": self.engine.rule_name, "ready": True}
 
+    # For the ablation that asks whether expected damage protects calls
+    # better than top label when the classifier is worse: every number the
+    # model sees is multiplied by a random factor, exp(N(0, noise)). The
+    # flow's kind and protocol are left alone; so is what the guard on
+    # Bulk reads. Zero, the default, changes nothing.
+    noise = 0.0
+    _rng = None
+
+    def blur(self, record):
+        if not self.noise:
+            return record
+        import numpy as np
+        if self._rng is None:
+            self._rng = np.random.default_rng(int(os.environ.get("AQOS_NOISE_SEED", "1")))
+        def f(values):
+            return np.exp(self._rng.normal(0.0, self.noise, len(values)))
+
+        out = dict(record)
+        sizes = np.asarray(record["pkt_sizes"], float)
+        out["pkt_sizes"] = [int(np.sign(s) * min(max(abs(s) * k, 40), 1500)) for s, k in zip(sizes, f(sizes))]
+        out["pkt_gaps_us"] = [int(g * k) for g, k in zip(record["pkt_gaps_us"], f(record["pkt_gaps_us"]))]
+        if record.get("window"):
+            w = dict(record["window"])
+            keys = [k for k, v in w.items() if k != "samples" and isinstance(v, (int, float))]
+            for k, factor in zip(keys, f(keys)):
+                w[k] = w[k] * factor
+            out["window"] = w
+        return out
+
     def answer(self, requests):
         """One response per request, in the same order."""
         responses = [None] * len(requests)
@@ -77,7 +106,7 @@ class Service:
             else:
                 todo.append(i)
         if todo:
-            records = [requests[i]["record"] for i in todo]
+            records = [self.blur(requests[i]["record"]) for i in todo]
             try:
                 many = getattr(self.classifier, "classify_many", None)
                 classifications = many(records) if many else [self.classifier.classify(r) for r in records]
@@ -164,7 +193,9 @@ def build(args):
         classifier = model.load(args.model, args.models)
         engine = decide.Engine(damage, mode=args.mode, demotion_bar=args.demotion_bar,
                                lease_multiplier=args.lease_multiplier, bulk_guard=not args.no_bulk_guard)
-    return Service(classifier, engine)
+    service = Service(classifier, engine)
+    service.noise = args.feature_noise
+    return service
 
 
 def main(argv=None):
@@ -178,6 +209,8 @@ def main(argv=None):
     parser.add_argument("--mode", choices=decide.MODES, default="expected_damage")
     parser.add_argument("--damage", help="damage table (default configs/damage_table.yaml)")
     parser.add_argument("--demotion-bar", type=float, default=0.8)
+    parser.add_argument("--feature-noise", type=float, default=0.0,
+                        help="multiply every number the model sees by exp(N(0, this)): a weaker classifier, for the ablation")
     parser.add_argument("--no-bulk-guard", action="store_true",
                         help="let the model demote UDP flows and first-packet records to Bulk, as before the guard")
     parser.add_argument("--lease-multiplier", type=float, default=5.0)

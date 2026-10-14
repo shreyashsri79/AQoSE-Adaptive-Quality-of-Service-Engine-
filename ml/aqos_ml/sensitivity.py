@@ -46,7 +46,7 @@ def balanced(values, labels, weights):
 
 
 def run(dataset_path, version=None, draws=200, seed=1):
-    version = version or (model.MODELS / "chosen-v1.txt").read_text().strip()
+    version = version or (model.MODELS / "chosen-v2.txt").read_text().strip()
     classifier = model.load(version)
     rows = list(dataset.load(dataset_path, splits={"validation"}))
     classifications = classifier.classify_many(rows)

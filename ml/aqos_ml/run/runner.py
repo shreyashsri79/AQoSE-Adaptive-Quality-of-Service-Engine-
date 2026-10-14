@@ -64,7 +64,17 @@ RULES = Path(os.environ.get("AQOS_RULES") or REPO / "configs" / "rules.yaml")
 # The label value for each tin, as internal/enforce defines it.
 TIN_MARK = {"bulk": 1, "best_effort": 2, "video": 3, "voice": 4}
 SUBJECT = "subject"
-NOT_YET = {"B1": "8D", "B3": "8D"}
+NOT_YET = {"B1": "8D"}
+# B3: plain CAKE with cake-autorate, the community's adaptive shaper,
+# unmodified, from third_party/ (git clone of v3.2.2).
+CONFIGS["B3"] = {"script": "configs/baselines/B2.sh", "cake": True, "autorate": True}
+AUTORATE = REPO / "third_party" / "cake-autorate"
+# cake-autorate reads the interfaces' byte counters from /sys and keeps
+# its state under /run. The testbed enters a namespace's network only, so
+# it would see the host's /sys; a private mount namespace with its own
+# sysfs and /run gives it the router's view without changing the script.
+_AUTORATE_WRAP = ("mount -t sysfs sysfs /sys && mount -t tmpfs tmpfs /run && "
+                  "exec bash \"$0\" \"$1\"")
 # Events the testbed applies, and events the runner applies itself. The
 # others need parts that do not exist yet.
 TESTBED_EVENTS = {"link_rate", "link_impair"}
@@ -126,9 +136,9 @@ def versions():
 
 def model_version():
     """The model the live configurations run: AQOS_MODEL if set, or the one
-    training chose for dataset v1."""
+    training chose for dataset v2."""
     version = os.environ.get("AQOS_MODEL")
-    chosen = MODELS / "chosen-v1.txt"
+    chosen = MODELS / "chosen-v2.txt"
     if not version and chosen.exists():
         version = chosen.read_text().strip()
     if not version or not (MODELS / version / "meta.json").exists():
@@ -139,6 +149,8 @@ def model_version():
 def service_args(config):
     """(arguments for aqos_ml.serve, the model version for the manifest)."""
     args, version = list(CONFIGS[config]["service"]), None
+    # Extra service flags, for the ablations (for example --feature-noise 1.0).
+    args += os.environ.get("AQOS_SERVE_ARGS", "").split()
     if "--rules" in args:
         from .. import rules
         version = rules.RULES_VERSION
@@ -326,6 +338,30 @@ class _Run:
         if result is not None and result.returncode != 0:
             self.problems.append(f"event {kind} at {event['at_s']} s failed: {result.stderr.strip()}")
 
+    def autorate(self, status):
+        """Starts cake-autorate on the router, set up as a home user would:
+        the configured rates as base and maximum (as our estimator never
+        goes above them), a tenth as minimum (as ours), and the testbed's
+        three reflectors pinged with ping."""
+        if not (AUTORATE / "cake-autorate.sh").exists():
+            raise RunError("cake-autorate is missing: git clone https://github.com/lynxthecat/cake-autorate "
+                           "third_party/cake-autorate && git -C third_party/cake-autorate checkout v3.2.2")
+        link, pct = self.scenario["link"], int(os.environ.get("SHAPER_PCT", "95"))
+        base = {"dl": link["down_kbit"] * pct // 100, "ul": link["up_kbit"] * pct // 100}
+        reflectors = " ".join(f'"{r}"' for r in status.get("reflectors") or [])
+        config = "\n".join([
+            "dl_if=ifb0", "ul_if=wan0", "pinger_binary=ping", f"reflectors=({reflectors})",
+            f"no_pingers={len(status.get('reflectors') or [])}", "randomize_reflectors=0",
+            "enable_sleep_function=0", "startup_wait_s=0.0", "log_to_file=1",
+            f"log_file_path_override=\"{self.out / 'autorate.log'}\"", "output_cake_changes=1",
+            *[f"{k}_{d}_shaper_rate_kbps={v}" for d in ("dl", "ul")
+              for k, v in (("min", max(base[d] // 10, 500)), ("base", base[d]), ("max", base[d]))],
+        ]) + "\n"
+        (self.out / "autorate.config.sh").write_text(config)
+        self.start("autorate", "router", ["unshare", "-m", "--propagation", "private", "sh", "-c", _AUTORATE_WRAP,
+                                          AUTORATE / "cake-autorate.sh", self.out / "autorate.config.sh"])
+        self.daemons.add("autorate")
+
     def perform(self):
         """Runs the traffic. Returns the bottleneck rates read at the end."""
         link = self.scenario["link"]
@@ -352,6 +388,9 @@ class _Run:
             if result.returncode != 0:
                 raise RunError(f"nft: {result.stderr.strip()}")
             self.log(f"forced tins: {tins}")
+
+        if CONFIGS[self.config].get("autorate"):
+            self.autorate(status)
 
         service = CONFIGS[self.config].get("service")
         if service:
