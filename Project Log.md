@@ -422,3 +422,17 @@ The full system is never worse than plain CAKE and better in five of nine scenar
 - The damage table keeps being wrong about what it did not measure. Three gaps found by scenarios so far (no reward for demotion; a call sacrificed for another; Voice as free). The report must say the table is a model of what matters and show these.
 - O1's 80% bar and the model's calibrated 70% for an upload's first packets: top label is fragile wherever one flow sits near the bar.
 - No own video-call capture in the final test; the dashboard has not been seen live; no charts (matplotlib is not installed).
+
+## 12. Oct 14: an outside review of the interim case study, and the plan it set
+
+A review of the interim page (six seeds) raised points that hold whatever the seed count. Accepted, and now the plan for the final numbers:
+
+1. **Add cake-autorate as B3** on S2 and S5. S2 compares an adaptive shaper with a fixed one, which any adaptive shaper wins.
+2. **Tuned on the test.** The relief rule, the Voice bar and the download-first estimator fix were all found by evaluation scenarios; seed 1 was the smoke seed and is also a matrix seed. After freezing: rerun every configuration on fresh seeds 10 to 19, and run one or two scenarios written after the freeze, once, reported whatever happens. Seed 1 is marked as a development seed.
+3. **Self-graded metric.** The cost scale is what the damage table, and so O2, is built from. Raw measurements (late frames, p95/p99 latency, jitter, loss, throughput, Jain's index) are the primary evidence; cost is the summary. The page now does this for late frames and latency.
+4. **Non-adaptive generators** overstate how badly CAKE treats a squeezed call. Drive one call generator through a real congestion controller (Pion's GCC-style estimator in Go was suggested).
+5. **Generalisation.** The leave-one-source-out table is now on the page (video calls 1.63, cloud gaming 2.13, downloads 2.23 with the source left out). Measure how often a relay switch starts a new flow with probe packets, and how long the call sits in Best Effort until the reclassifier catches it.
+6. **Expected damage against top label** rests on S5 alone live. The weakened-classifier ablation is essential, not optional. The Voice bar is a hand rule and the page now says so.
+7. **Statistics on six seeds** are unstable; ten seeds, Wilcoxon with Holm, and the A/A band on every chart.
+
+Also missing against the judging criteria: CPU per component at 25, 50 and 100 Mbit/s; S9; fairness and starvation evidence; IPv6 end to end; the VPN case. Done today: classifier accuracy, macro-F1, per-class recall and calibration error on the page; a sensitivity check of the damage table (`python -m aqos_ml.sensitivity`, `reports/sensitivity-v1.md`): scaling every cell by 0.75 to 1.25 moves at most 2.1% of placements, but moving every cell by up to one point moves up to 39%, because the many zero cells are where the table is weakest.
