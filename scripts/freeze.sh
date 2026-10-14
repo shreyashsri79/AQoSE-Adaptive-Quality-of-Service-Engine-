@@ -12,7 +12,10 @@ say() { echo "$(date '+%a %H:%M:%S') $*"; }
 fail() { say "STOPPED: $*"; echo "STOPPED: $*" > "$main/FREEZE-STATUS"; exit 1; }
 
 say "waiting for the matrix and the A/A runs"
-while pgrep -f "aqos_ml.run matri[x]" >/dev/null || pgrep -f "aqos_ml.repor[t]" >/dev/null; do sleep 60; done
+# The pre-freeze chain ends by writing reports/core.md; between its matrix
+# and its A/A runs there is a moment with no matrix process at all.
+while [[ ! -f $main/reports/core.md ]] || pgrep -f "aqos_ml.run matri[x]" >/dev/null \
+        || pgrep -f "aqos_ml.repor[t]" >/dev/null; do sleep 60; done
 aa=$(ls "$main"/results-aa/*/manifest.json 2>/dev/null | wc -l)
 core=$(ls "$main"/results-core/*/manifest.json 2>/dev/null | wc -l)
 say "matrix: $core runs, A/A: $aa runs"
