@@ -92,7 +92,7 @@ class Service:
                 source = "reclassifier" if request["record"]["kind"] == "window" else "decision_engine"
                 proposal = self.engine.propose(
                     classification, request["record"]["host_id"], previous_tin=request["previous_tin"],
-                    leased_classes=request["leased_classes"], source=source)
+                    leased_classes=request["leased_classes"], source=source, record=request["record"])
                 responses[i] = {"id": request["id"], "ok": True, "classification": classification,
                                 "proposal": proposal}
         return responses
@@ -158,11 +158,12 @@ def build(args):
     damage = evaluate.load_damage_table(args.damage) if args.damage else evaluate.load_damage_table()
     if args.rules:
         classifier = rules.Rules(args.bulk_pps, args.priority_bytes)
-        engine = decide.Engine(damage, mode="top_label", demotion_bar=args.demotion_bar, rule_name="rules")
+        engine = decide.Engine(damage, mode="top_label", demotion_bar=args.demotion_bar, rule_name="rules",
+                               bulk_guard=False)
     else:
         classifier = model.load(args.model, args.models)
         engine = decide.Engine(damage, mode=args.mode, demotion_bar=args.demotion_bar,
-                               lease_multiplier=args.lease_multiplier)
+                               lease_multiplier=args.lease_multiplier, bulk_guard=not args.no_bulk_guard)
     return Service(classifier, engine)
 
 
@@ -177,6 +178,8 @@ def main(argv=None):
     parser.add_argument("--mode", choices=decide.MODES, default="expected_damage")
     parser.add_argument("--damage", help="damage table (default configs/damage_table.yaml)")
     parser.add_argument("--demotion-bar", type=float, default=0.8)
+    parser.add_argument("--no-bulk-guard", action="store_true",
+                        help="let the model demote UDP flows and first-packet records to Bulk, as before the guard")
     parser.add_argument("--lease-multiplier", type=float, default=5.0)
     parser.add_argument("--bulk-pps", type=float, default=200.0)
     parser.add_argument("--priority-bytes", type=float, default=450.0)

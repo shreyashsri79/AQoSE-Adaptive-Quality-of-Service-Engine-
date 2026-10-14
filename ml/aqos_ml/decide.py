@@ -54,7 +54,7 @@ class Engine:
     or a game before it puts it in Voice."""
 
     def __init__(self, damage, mode="expected_damage", demotion_bar=0.8, lease_multiplier=5.0, rule_name=None,
-                 tie_margin=0.05, voice_bar=0.5):
+                 tie_margin=0.05, voice_bar=0.5, bulk_guard=True):
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}, not {mode!r}")
         self.damage, self.mode = damage, mode
@@ -74,6 +74,18 @@ class Engine:
         # and the game lost half its frames. Like Bulk, Voice needs
         # evidence: the flow is probably one of the classes Voice is for.
         self.voice_bar = voice_bar
+        # Bulk also needs evidence besides the model's confidence. Trained
+        # without a data source and tested on it, the model sent 16% of
+        # unseen video-call records to Bulk, confidently wrong. Two facts
+        # the model cannot be wrong about are checked: a flow is not
+        # demoted on its first eight packets alone, only once it has run
+        # for a few seconds; and a UDP flow is never demoted, because the
+        # traffic that suffers in Bulk (calls, games, cloud gaming) is
+        # UDP, and the traffic that belongs there is mostly TCP. The cost:
+        # peer-to-peer traffic over UDP stays in Best Effort, where plain
+        # CAKE would have it. With the guard, the held-out video calls,
+        # cloud games and downloads went to Bulk 0% of the time.
+        self.bulk_guard = bulk_guard
         self._voice_classes = [c for c in CLASSES if TAXONOMY["classes"][c]["tin"] == "voice"]
         # The classes whose least damaging tin is Bulk according to the
         # table. In top-label mode it is the taxonomy that says so.
@@ -99,10 +111,12 @@ class Engine:
         table = self._table(leased_classes)
         return {tin: sum(probs[cls] * table[cls][tin] for cls in CLASSES) for tin in TINS}
 
-    def choose(self, classification, leased_classes=()):
+    def choose(self, classification, leased_classes=(), record=None):
         """Returns (tin, top class, expected damage per tin, held back).
-        held back is True when the rule chose Bulk and the demotion bar
-        turned that into Best Effort."""
+        held back is True when the rule chose Bulk and the demotion bar,
+        or the guard on Bulk, turned that into Best Effort. record is the
+        feature record the classification is about; without it the guard
+        cannot look and does not hold anything back."""
         probs = _checked(classification["probs"])
         top = max(CLASSES, key=lambda c: (probs[c], -CLASSES.index(c)))
         expected = self.expected(probs, leased_classes)
@@ -116,22 +130,28 @@ class Engine:
             tied = [t for t in allowed if expected[t] - lowest <= self.tie_margin]
             own = TAXONOMY["classes"][top]["tin"]
             tin = own if own in tied and own != "bulk" else min(tied, key=_TIE_ORDER.get)
-        held = tin == "bulk" and sum(probs[c] for c in self._bulk_classes) <= self.demotion_bar
+        held = tin == "bulk" and (sum(probs[c] for c in self._bulk_classes) <= self.demotion_bar
+                                  or self.guarded(record))
         return (SAFE_TIN if held else tin), top, expected, held
 
-    def tin(self, classification):
+    def guarded(self, record):
+        """Whether the guard keeps this flow out of Bulk whatever the model says."""
+        return bool(self.bulk_guard and record is not None
+                    and (record.get("kind") == "initial" or record.get("protocol") == 17))
+
+    def tin(self, classification, record=None):
         """The tin alone, in the form evaluate.score takes as `decide`."""
-        return self.choose(classification)[0]
+        return self.choose(classification, record=record)[0]
 
     def propose(self, classification, host_id, previous_tin=None, leased_classes=(),
-                source="decision_engine", ts_ns=None, proposal_id=None):
+                source="decision_engine", ts_ns=None, proposal_id=None, record=None):
         """A policy proposal for the flow the classification is about. Never
         raises: anything wrong gives the fallback proposal for Best Effort."""
         ts_ns = time.monotonic_ns() if ts_ns is None else ts_ns
         proposal_id = proposal_id or new_id()
         flow_id = classification.get("flow_id") if isinstance(classification, dict) else None
         try:
-            tin, top, expected, held = self.choose(classification, leased_classes)
+            tin, top, expected, held = self.choose(classification, leased_classes, record)
             dscp = TAXONOMY["classes"][top]["dscp"] if TAXONOMY["classes"][top]["tin"] == tin \
                 else TAXONOMY["tins"][tin]["dscp"]
             label = {
@@ -140,7 +160,7 @@ class Engine:
                 "expected_damage": round(expected[tin], 6), "decision_rule": self.rule_name,
             }
             reason = self._reason(classification["probs"], tin, top, expected, held,
-                                  bool(set(leased_classes) & set(INTERACTIVE)))
+                                  bool(set(leased_classes) & set(INTERACTIVE)), held and self.guarded(record))
         except Exception as err:  # noqa: BLE001 - the whole point is to catch everything
             label = {
                 "flow_id": flow_id, "host_id": host_id, "tin": SAFE_TIN,
@@ -153,10 +173,13 @@ class Engine:
             "kind": "flow_label", "reason": reason, "flow_label": label,
         }
 
-    def _reason(self, probs, tin, top, expected, held, leased):
+    def _reason(self, probs, tin, top, expected, held, leased, guarded=False):
         text = f"Looks like {PLAIN[top]} ({probs[top]:.0%} confident)"
         top_tin = TAXONOMY["classes"][top]["tin"]
-        if held:
+        if guarded:
+            text += ("; not demoted to Bulk on its first packets, or while it is UDP, as calls and games are,"
+                     " so it stays in Best Effort.")
+        elif held:
             text += (f"; not sure enough to demote it to Bulk (needs over {self.demotion_bar:.0%}),"
                      " so it stays in Best Effort.")
         elif self.mode == "top_label":

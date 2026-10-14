@@ -46,6 +46,17 @@ type Config struct {
 	// CutHold is the shortest time between two such blind cuts, so that
 	// one queue is not answered twice.
 	CutHold time.Duration
+	// UpWait: while the download is busy, the probes' delay may as well be
+	// a queue on the way down, and that one can be measured and cut
+	// properly. The upload is then cut only once the download has been
+	// cut and the delay is still high this long after. Round-trip probes
+	// cannot tell the two directions apart; in S5 three streams queued on
+	// the way down, the upload was cut blind eleven times on a link whose
+	// upload never changed, and the call on it lost 45% of its frames.
+	UpWait time.Duration
+	// DownBusy is the share of the download's rate in use above which the
+	// download counts as a possible cause.
+	DownBusy float64
 	// Settle is the shortest time between two measured cuts: long enough
 	// for the first to show in the delay.
 	Settle time.Duration
@@ -94,7 +105,7 @@ type Config struct {
 func DefaultConfig(baseUp, baseDown, minUp, minDown int) Config {
 	return Config{
 		Reflectors: 3, ThresholdMs: 15, Consecutive: 3, MinAnswering: 2, Silent: 3 * time.Second,
-		CutTo: 0.90, CutBlind: 0.75, CutHold: time.Second, Settle: 300 * time.Millisecond, DrainMs: 10, Idle: 0.02,
+		CutTo: 0.90, CutBlind: 0.75, CutHold: time.Second, UpWait: 2 * time.Second, DownBusy: 0.5, Settle: 300 * time.Millisecond, DrainMs: 10, Idle: 0.02,
 		Fresh:    600 * time.Millisecond,
 		LoadHigh: 0.75, StepUp: 0.10, RaiseEvery: 10 * time.Second, Calm: 2 * time.Second,
 		BaseKbit:     map[string]int{"up": baseUp, "down": baseDown},
@@ -130,6 +141,7 @@ type direction struct {
 	readings     []reading
 	have         bool
 	lastCutNs    int64
+	firstCutNs   int64 // the first cut since the delay was last low
 	lastRaiseNs  int64
 	cut, raised  bool
 }
@@ -370,12 +382,19 @@ func (e *Estimator) Decide(nowNs int64) []contracts.PolicyProposal {
 				if d.cut && (nowNs-d.lastCutNs < int64(e.cfg.CutHold) || draining) {
 					continue
 				}
+				if down := e.dirs["down"]; down.have && down.achievedKbit >= e.cfg.DownBusy*float64(down.shaperKbit) &&
+					(!down.cut || nowNs-down.firstCutNs < int64(e.cfg.UpWait)) {
+					continue // the download first: its queue can be measured
+				}
 				target = int(e.cfg.CutBlind * float64(d.shaperKbit))
 				how = "what gets through cannot be measured from here, so by a fixed share"
 			}
 			target = max(target, e.cfg.MinKbit[dir])
 			if target >= d.shaperKbit {
 				continue
+			}
+			if !d.cut {
+				d.firstCutNs = nowNs
 			}
 			d.cut, d.lastCutNs = true, nowNs
 			propose(dir, d, target, fmt.Sprintf(

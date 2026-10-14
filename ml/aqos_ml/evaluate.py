@@ -26,7 +26,7 @@ def load_damage_table(path=REPO / "configs" / "damage_table.yaml"):
     return table
 
 
-def top_label_tin(classification):
+def top_label_tin(classification, record=None):
     """The tin of the most likely class: decision rule O1. Ties go to the
     class listed first in the taxonomy, so the answer never depends on
     dictionary order."""
@@ -69,7 +69,7 @@ def score(classifier, rows, damage, decide=top_label_tin):
         weight = 1 / per_flow[row.get("session"), row["flow_id"]]
         probs = classification["probs"]
         predicted = max(CLASSES, key=lambda c: (probs[c], -CLASSES.index(c)))
-        tin = decide(classification)
+        tin = decide(classification, row)
         cell = reliability[min(int(probs[predicted] * ECE_BINS), ECE_BINS - 1)]
         cell[0] += weight
         cell[1] += weight * probs[predicted]

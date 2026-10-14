@@ -222,7 +222,8 @@ def train(dataset_path, models=model.MODELS, damage_path=None, seed=1, jobs=4, t
     # The rules, tuned on the same training data and judged on the same
     # validation data, for a first look. The real comparison is chunk 6B.
     tuned, _, _ = rules.tune(train_.rows, damage)
-    rules_result = evaluate.score(tuned, val.rows, damage, decide=decide.Engine(damage, mode="top_label").tin)
+    rules_result = evaluate.score(tuned, val.rows, damage,
+                                  decide=decide.Engine(damage, mode="top_label", bulk_guard=False).tin)
 
     importances = None
     inner = candidates[chosen]["estimator"].calibrated_classifiers_[0].estimator

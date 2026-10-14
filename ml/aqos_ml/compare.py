@@ -45,7 +45,7 @@ def placements(classifier, rows, damage, decide_tin):
     classifications = many(rows) if many else [classifier.classify(r) for r in rows]
     flows = {}
     for row, classification in zip(rows, classifications):
-        tin = decide_tin(classification)
+        tin = decide_tin(classification, row)
         entry = flows.setdefault((row["session"], row["flow_id"]),
                                  [row["session"], row["label"], row.get("activity"), row["source"], [], Counter()])
         entry[4].append(damage[row["label"]][tin])
@@ -99,10 +99,13 @@ def share(flows, tin, where):
 
 def contestants(name, digest, damage, train_rows, models_dir):
     """[(label, classifier, decide function)], rules first."""
+    # The rules stand in for existing tools and keep their own behaviour:
+    # no guard on Bulk. The models' decision rules have it, as live.
     top = decide.Engine(damage, mode="top_label")
+    plain = decide.Engine(damage, mode="top_label", bulk_guard=False)
     tuned, _, _ = rules.tune(train_rows, damage)
-    out = [("Rules, qosify defaults", rules.Rules(), top.tin),
-           (f"Rules, tuned ({tuned.bulk_pps:g} pkt/s, {tuned.priority_bytes:g} B)", tuned, top.tin)]
+    out = [("Rules, qosify defaults", rules.Rules(), plain.tin),
+           (f"Rules, tuned ({tuned.bulk_pps:g} pkt/s, {tuned.priority_bytes:g} B)", tuned, plain.tin)]
     for kind, title in (("rf", "Random forest"), ("lgbm", "LightGBM")):
         version = f"{kind}-{name}-{digest[:8]}"
         if not (Path(models_dir) / version / "meta.json").exists():

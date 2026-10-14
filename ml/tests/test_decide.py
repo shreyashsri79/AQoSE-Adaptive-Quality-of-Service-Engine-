@@ -174,7 +174,7 @@ def test_engine_is_what_evaluate_scores_with():
             return classification(telephony=0.45, low_priority_data=0.55)
 
     rows = [{"flow_id": "f1", "session": "s", "label": "telephony"}]
-    gamble = evaluate.score(Fixed(), rows, DAMAGE, decide=lambda c: "bulk")
+    gamble = evaluate.score(Fixed(), rows, DAMAGE, decide=lambda c, record=None: "bulk")
     hedge = evaluate.score(Fixed(), rows, DAMAGE, decide=decide.Engine(DAMAGE).tin)
     assert (gamble["expected_damage"], hedge["expected_damage"]) == (10, 2)
 
@@ -182,3 +182,19 @@ def test_engine_is_what_evaluate_scores_with():
 def test_unknown_mode_is_refused():
     with pytest.raises(ValueError):
         decide.Engine(DAMAGE, mode="guess")
+
+
+def test_bulk_needs_more_than_confidence():
+    """Confidently 'background transfer' is not enough on a flow's first
+    packets, or for a UDP flow: unseen calls were sent to Bulk that way."""
+    sure = classification(low_priority_data=0.97, standard=0.03)
+    engine = decide.Engine(evaluate.load_damage_table())
+    window_tcp = {"kind": "window", "protocol": 6}
+    assert engine.tin(sure, window_tcp) == "bulk"
+    assert engine.tin(sure, {"kind": "initial", "protocol": 6}) == "best_effort"
+    assert engine.tin(sure, {"kind": "window", "protocol": 17}) == "best_effort"
+    assert engine.tin(sure) == "bulk"  # without a record there is nothing to check
+    unguarded = decide.Engine(evaluate.load_damage_table(), bulk_guard=False)
+    assert unguarded.tin(sure, {"kind": "window", "protocol": 17}) == "bulk"
+    proposal = engine.propose(sure, "a1b2c3d4e5f60718", record={"kind": "window", "protocol": 17})
+    assert proposal["flow_label"]["tin"] == "best_effort" and "while it is UDP" in proposal["reason"]

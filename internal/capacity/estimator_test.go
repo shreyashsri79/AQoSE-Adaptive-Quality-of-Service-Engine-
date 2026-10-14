@@ -464,3 +464,70 @@ func TestAllProbesWaitingIsAQueue(t *testing.T) {
 		t.Fatal("every probe waiting for half a second caused no cut")
 	}
 }
+
+// Both directions busy and the probes' delay high: round trips cannot say
+// which way the queue is. The download's can be measured and cut properly,
+// so it goes first; the upload is cut blind only if the delay outlasts
+// that. In S5 the upload was cut eleven times for a queue that was on the
+// way down, and the call on it broke.
+func TestTheDownloadIsCutBeforeTheUpload(t *testing.T) {
+	e := New(DefaultConfig(4_750, 23_750, 500, 1_000))
+	now := int64(1e12)
+	cuts := map[string]int{}
+	tick := func(delayMs float64) {
+		now += 100 * ms
+		for r := 0; r < 3; r++ {
+			e.Probe(r, 20+delayMs, true, 0, 0)
+		}
+		e.Load("down", e.dirs["down"].shaperKbit, 20_000, now)
+		e.Load("up", e.dirs["up"].shaperKbit, 4_500, now)
+		for _, p := range e.Decide(now) {
+			cuts[p.ShaperRate.Direction]++
+			e.Applied(p.ShaperRate.Direction, p.ShaperRate.RateKbit)
+		}
+	}
+	for i := 0; i < 30; i++ {
+		tick(0) // a baseline with no queue
+	}
+	e.Applied("down", 23_750)
+	e.Applied("up", 4_750)
+	for i := 0; i < 15; i++ {
+		tick(60) // a queue, 1.5 s of it
+	}
+	if cuts["down"] == 0 || cuts["up"] != 0 {
+		t.Fatalf("in the first 1.5 s: %d download cuts, %d upload cuts; want the download only", cuts["down"], cuts["up"])
+	}
+	for i := 0; i < 30; i++ {
+		tick(60) // still there 3 s later: now the upload may be the cause
+	}
+	if cuts["up"] == 0 {
+		t.Fatal("the upload was never cut although the delay outlasted the download's cut")
+	}
+}
+
+// With the download quiet the upload is the only candidate and is cut at once.
+func TestAnUploadAloneIsCutAtOnce(t *testing.T) {
+	e := New(DefaultConfig(4_750, 23_750, 500, 1_000))
+	now := int64(1e12)
+	up := 0
+	for i := 0; i < 45; i++ {
+		now += 100 * ms
+		delay := 0.0
+		if i >= 30 {
+			delay = 60
+		}
+		for r := 0; r < 3; r++ {
+			e.Probe(r, 20+delay, true, 0, 0)
+		}
+		e.Load("down", 23_750, 100, now)
+		e.Load("up", 4_750, 4_500, now)
+		for _, p := range e.Decide(now) {
+			if p.ShaperRate.Direction == "up" {
+				up++
+			}
+		}
+	}
+	if up == 0 {
+		t.Fatal("a busy upload with a quiet download was not cut")
+	}
+}

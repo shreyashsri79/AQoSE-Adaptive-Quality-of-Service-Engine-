@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 def placements(classifications, rows, table):
     engine = decide.Engine(table)
-    return [engine.tin(c) for c in classifications]
+    return [engine.tin(c, row) for c, row in zip(classifications, rows)]
 
 
 def flow_weights(rows):
