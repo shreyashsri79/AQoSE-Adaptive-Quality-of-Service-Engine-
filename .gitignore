@@ -24,3 +24,5 @@ __pycache__/
 # The random forest is 12 MB and is not the chosen model; training rebuilds it.
 /models/rf-*/model.joblib
 /third_party/
+FREEZE-STATUS
+freeze-check.log
