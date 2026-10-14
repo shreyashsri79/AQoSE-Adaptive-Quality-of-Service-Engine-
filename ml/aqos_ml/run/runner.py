@@ -73,7 +73,7 @@ AUTORATE = REPO / "third_party" / "cake-autorate"
 # its state under /run. The testbed enters a namespace's network only, so
 # it would see the host's /sys; a private mount namespace with its own
 # sysfs and /run gives it the router's view without changing the script.
-_AUTORATE_WRAP = ("mount -t sysfs sysfs /sys && mount -t tmpfs tmpfs /run && "
+_AUTORATE_WRAP = ("mount -t sysfs sysfs /sys && mount -t tmpfs tmpfs /run && mount -t tmpfs tmpfs /var/log && "
                   "exec bash \"$0\" \"$1\"")
 # Events the testbed applies, and events the runner applies itself. The
 # others need parts that do not exist yet.
@@ -368,17 +368,22 @@ class _Run:
         link, pct = self.scenario["link"], int(os.environ.get("SHAPER_PCT", "95"))
         base = {"dl": link["down_kbit"] * pct // 100, "ul": link["up_kbit"] * pct // 100}
         reflectors = " ".join(f'"{r}"' for r in status.get("reflectors") or [])
+        floor = {d: max(base[d] // 10, 500) for d in base}
         config = "\n".join([
             "dl_if=ifb0", "ul_if=wan0", "pinger_binary=ping", f"reflectors=({reflectors})",
             f"no_pingers={len(status.get('reflectors') or [])}", "randomize_reflectors=0",
             "enable_sleep_function=0", "startup_wait_s=0.0", "log_to_file=1",
-            f"log_file_path_override=\"{self.out / 'autorate.log'}\"", "output_cake_changes=1",
+            f"log_file_path_override=\"{self.out}\"", "output_cake_changes=1",
+            # It refuses a threshold for "busy" above the minimum rates.
+            f"connection_active_thr_kbps={min(2000, *floor.values())}",
             *[f"{k}_{d}_shaper_rate_kbps={v}" for d in ("dl", "ul")
-              for k, v in (("min", max(base[d] // 10, 500)), ("base", base[d]), ("max", base[d]))],
+              for k, v in (("min", floor[d]), ("base", base[d]), ("max", base[d]))],
         ]) + "\n"
-        (self.out / "autorate.config.sh").write_text(config)
-        self.start("autorate", "router", ["unshare", "-m", "--propagation", "private", "sh", "-c", _AUTORATE_WRAP,
-                                          AUTORATE / "cake-autorate.sh", self.out / "autorate.config.sh"])
+        # Its instance name comes from the file name: config.<name>.sh.
+        (self.out / "config.b3.sh").write_text(config)
+        self.start("autorate", "router", ["env", f"CAKE_AUTORATE_SCRIPT_PREFIX={AUTORATE}",
+                                          "unshare", "-m", "--propagation", "private", "sh", "-c", _AUTORATE_WRAP,
+                                          AUTORATE / "cake-autorate.sh", self.out / "config.b3.sh"])
         self.daemons.add("autorate")
 
     def perform(self):
