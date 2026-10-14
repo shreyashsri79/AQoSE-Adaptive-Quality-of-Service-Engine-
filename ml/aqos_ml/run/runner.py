@@ -166,6 +166,27 @@ def service_args(config):
 CLASSIFY = REPO / "bin" / "aqos-classify"
 
 
+def _cpu_seconds(pid):
+    """CPU seconds a process and everything under it have used so far, from
+    /proc. The runner starts each part through aqos-testbed exec, so the
+    part itself is a descendant of the process it knows."""
+    children, ticks = {}, {}
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            fields = stat.read_text().rsplit(")", 1)[1].split()
+        except (OSError, IndexError):
+            continue
+        p = int(stat.parent.name)
+        children.setdefault(int(fields[1]), []).append(p)
+        ticks[p] = sum(int(f) for f in fields[11:15])  # utime, stime, cutime, cstime
+    total, todo = 0, [pid]
+    while todo:
+        p = todo.pop()
+        total += ticks.get(p, 0)
+        todo += children.get(p, [])
+    return round(total / os.sysconf("SC_CLK_TCK"), 2)
+
+
 def service_command(config, socket_path, args, version):
     """The ML service for a configuration. The classifier configurations
     run the Go service, which gives the Python service's answers exactly
@@ -503,6 +524,8 @@ class _Run:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 self.problems.append(f"{name}: still running after the end of the run")
+        (self.out / "cpu.json").write_text(json.dumps(
+            {name: _cpu_seconds(self.procs[name].pid) for name in sorted(self.daemons)}, indent=2) + "\n")
         for name in self.daemons:
             if self.procs[name].poll() is not None:
                 self.problems.append(f"{name}: stopped during the run (exit {self.procs[name].returncode})")

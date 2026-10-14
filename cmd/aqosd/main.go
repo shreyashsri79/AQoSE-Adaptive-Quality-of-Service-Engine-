@@ -246,8 +246,12 @@ func main() {
 	fmt.Fprintf(os.Stderr, "aqosd: %s; extractor read %d packets, %d overflows, %d flows untracked\n",
 		ctl.Summary(), stats.Packets, stats.Overflows, stats.Untracked)
 	if *summary != "" {
+		// What the controller itself cost: CPU seconds over the whole run.
+		var usage syscall.Rusage
+		syscall.Getrusage(syscall.RUSAGE_SELF, &usage)
+		cpu := float64(usage.Utime.Nano()+usage.Stime.Nano()) / 1e9
 		out, _ := json.MarshalIndent(map[string]any{
-			"model_version": health.ModelVersion, "decision_rule": health.DecisionRule,
+			"model_version": health.ModelVersion, "decision_rule": health.DecisionRule, "cpu_s": cpu,
 			"flows": ctl.Counts(), "shield": tracker.Counts(),
 			"extractor": map[string]uint64{"packets": stats.Packets, "overflows": stats.Overflows, "untracked": stats.Untracked},
 		}, "", "  ")
