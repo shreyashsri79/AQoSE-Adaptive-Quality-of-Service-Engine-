@@ -179,3 +179,19 @@ def test_table_puts_configurations_side_by_side(tmp_path):
     assert "| download (bulk_download) | throughput Mbit/s | 80.0 | 20.0 |" in text
     assert "| download (bulk_download) | **cost** | 0.00 | 0.67 |" in text  # a quarter of its usual speed
     assert "| *all entries* | **summed cost** | **0.00** | **1.67** |" in text
+
+
+def test_classifier_configurations_run_the_go_service(monkeypatch):
+    from aqos_ml.run import runner
+    monkeypatch.delenv("AQOS_SERVICE", raising=False)
+    monkeypatch.delenv("AQOS_SERVE_ARGS", raising=False)
+    version = (runner.MODELS / "chosen-v2.txt").read_text().strip()
+    if not (runner.MODELS / version / "trees.json").exists() or not runner.CLASSIFY.exists():
+        import pytest
+        pytest.skip("trees.json or bin/aqos-classify missing: python -m aqos_ml.export; make build")
+    o1 = runner.service_command("O1", "s.sock", ["--model", version, "--mode", "top_label"], version)
+    assert o1[0] == runner.CLASSIFY and o1[o1.index("-mode") + 1] == "top_label"
+    rules = runner.service_command("B4", "s.sock", ["--rules"], "qosify-rules-v1")
+    assert "aqos_ml.serve" in rules
+    monkeypatch.setenv("AQOS_SERVE_ARGS", "--feature-noise 1.0")
+    assert "aqos_ml.serve" in runner.service_command("O2", "s.sock", ["--model", version], version)

@@ -163,6 +163,25 @@ def service_args(config):
     return args, version
 
 
+CLASSIFY = REPO / "bin" / "aqos-classify"
+
+
+def service_command(config, socket_path, args, version):
+    """The ML service for a configuration. The classifier configurations
+    run the Go service, which gives the Python service's answers exactly
+    (internal/classify's tests) and is what a router would run; the rules
+    (B4), and any run with extra service flags, run the Python one.
+    AQOS_SERVICE=python runs Python for everything."""
+    python = [sys.executable, "-m", "aqos_ml.serve", "--socket", socket_path, *args]
+    trees = MODELS / str(version) / "trees.json"
+    if ("--rules" in args or os.environ.get("AQOS_SERVICE", "go") == "python"
+            or os.environ.get("AQOS_SERVE_ARGS", "").strip() or not trees.exists() or not CLASSIFY.exists()):
+        return python
+    mode = args[args.index("--mode") + 1] if "--mode" in args else "expected_damage"
+    return [CLASSIFY, "-socket", socket_path, "-model", trees, "-mode", mode,
+            "-damage", REPO / "configs" / "damage_table.yaml"]
+
+
 def entry_tins(scenario, forced):
     """{traffic id: tin} for a forced-tin run: the subject in the forced
     tin, every other entry in the tin of its own class."""
@@ -374,6 +393,8 @@ class _Run:
             "estimator": bool(CONFIGS[self.config].get("estimator")) and os.environ.get("AQOS_ESTIMATOR", "1") != "0",
             "reclassifier": os.environ.get("AQOS_RECLASSIFIER", "1") != "0",
             "aqosd_args": os.environ.get("AQOSD_ARGS", ""),
+            "serve_args": os.environ.get("AQOS_SERVE_ARGS", ""),
+            "service": os.environ.get("AQOS_SERVICE", "go"),
         }, indent=2) + "\n")
         self.log(_testbed("exec", "router", "--", REPO / CONFIGS[self.config]["script"],
                           link["down_kbit"], link["up_kbit"]).strip())
@@ -400,7 +421,7 @@ class _Run:
             # 108 bytes, and a results directory can be anywhere.
             socket_path = _lock_path().with_name(f"ml-{os.getpid()}.sock")
             socket_path.unlink(missing_ok=True)
-            self.start("ml-service", "router", [sys.executable, "-m", "aqos_ml.serve", "--socket", socket_path, *args])
+            self.start("ml-service", "router", service_command(self.config, socket_path, args, self.model_version))
             self.daemons.add("ml-service")
             for _ in range(300):
                 if socket_path.exists() or self.procs["ml-service"].poll() is not None:
