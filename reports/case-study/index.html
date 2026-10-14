@@ -99,16 +99,16 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
 <header>
   <p class="eyebrow">Teliport Season 4 · case study · interim, 6 of 10 seeds</p>
   <h1>Adaptive QoS Engine</h1>
-  <p class="lede">A home router that recognises a video call, a game or a download from packet sizes and timing alone, and puts each in the right priority queue of Linux CAKE. On the same traffic, it leaves seven times fewer flows unusable than plain CAKE, and it never once did worse than the hand-written threshold rules that existing tools use.</p>
+  <p class="lede">A home router that recognises a video call, a game or a download from packet sizes and timing alone, and puts each in the right priority queue of Linux CAKE. It beats plain CAKE when a call or a game shares its device with bulk traffic, ties it when they are alone on their devices, and never did worse than the hand-written threshold rules that existing tools use.</p>
   <p class="meta">Measured Oct 13–14, 2026 · 270 runs, all valid · reference laptop: Fedora 43, kernel 7.2.8, 16 cores</p>
 </header>
 
 <section class="wide" aria-label="Headline results">
   <div class="figures">
-    <div class="figure-cell"><span class="big ours num">0.73</span><span class="what">flows left unusable over all nine scenarios with the full system. Plain CAKE: <span class="num">5.58</span>. Rules: <span class="num">6.91</span>. No QoS: <span class="num">12.31</span>.</span></div>
-    <div class="figure-cell"><span class="big ours num">87%</span><span class="what">less damage than plain CAKE, the router setup this project has to beat. Median of six seeds.</span></div>
-    <div class="figure-cell"><span class="big ours num">53 / 54</span><span class="what">scenario runs in which it did as well as plain CAKE or better: 29 wins, 24 ties, 1 loss (cause found and fixed, see below).</span></div>
-    <div class="figure-cell"><span class="big ours num">94% → 2%</span><span class="what">late frames of an HD video call on a laptop that is also sharing files (scenario S6), plain CAKE against the full system.</span></div>
+    <div class="figure-cell"><span class="big ours num">94% → 2%</span><span class="what">late frames of an HD video call on a laptop that is also sharing files (S6): plain CAKE against the classifier. Won by the classifier.</span></div>
+    <div class="figure-cell"><span class="big ours num">83% → 0.6%</span><span class="what">late frames of a cloud game on a PC fetching an update (S7). The threshold rules: 19%. Won by the classifier.</span></div>
+    <div class="figure-cell"><span class="big ours num">56% → 0.9%</span><span class="what">late frames of a call when the line drops to a fifth of its speed (S2). Won by the capacity estimator, not the classifier.</span></div>
+    <div class="figure-cell"><span class="big ours num">53 / 54</span><span class="what">scenario runs as good as plain CAKE or better: 29 wins, 24 ties, 1 loss (cause found, fix being rerun).</span></div>
   </div>
 </section>
 
@@ -143,7 +143,7 @@ flowchart LR
 </pre>
   </div>
   <ul class="plain">
-    <li><strong>Expected damage, not top label.</strong> At 45% video call and 55% download, top label sends the flow to Bulk, which ruins it if it is the call. Expected damage weighs that risk and keeps it out of Bulk. Demotion to Bulk, and since this week promotion to Voice, each need the model to be sure.</li>
+    <li><strong>Expected damage, not top label.</strong> At 45% video call and 55% download, top label sends the flow to Bulk, which ruins it if it is the call. Expected damage weighs that risk and keeps it out of Bulk. Two hand rules sit on top of it: a flow goes to Bulk only when the model is over 80% sure it belongs there, and to Voice only when it is over 50% sure it is a call or a game. The second was added this week after a scenario showed the damage table rating Voice as free (see "What we learned").</li>
     <li><strong>The damage table is measured, not guessed.</strong> Each of seven classes was forced into each of four tins beside a call, a stream, a download and a peer-to-peer transfer, under three conditions, two seeds each: 240 runs.</li>
     <li><strong>Reclassifier.</strong> Once a second each labelled flow is compared with its class's normal range. A flow that leaves it is asked about again; one that stays inside costs nothing.</li>
     <li><strong>Capacity estimator.</strong> Probes three reflectors every 100 ms and lowers CAKE's rate when the line slows, so the queue stays where CAKE can manage it.</li>
@@ -173,8 +173,34 @@ flowchart LR
 </section>
 
 <section class="wide">
-  <p class="eyebrow">Results</p>
-  <h2>Seven times fewer ruined flows than plain CAKE</h2>
+  <p class="eyebrow">Results in raw measurements</p>
+  <h2>What the calls and games experienced</h2>
+  <p>The cost scale below is the same yardstick the decision engine optimises, so the raw measurements come first. Median of six seeds; late frames are video or game frames that missed their deadline (100 ms for calls, 50 ms for games).</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Flow</th><th>Measure</th><th class="n">CAKE</th><th class="n">Rules</th><th class="n">Top label</th><th class="n ours">Full system</th><th>Won by</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">S2</td><td>call</td><td>late frames, %</td><td class="n">55.5</td><td class="n">55.6</td><td class="n">0.9</td><td class="n ours">0.9</td><td>capacity estimator</td></tr>
+        <tr><td class="tag">S2</td><td>call</td><td>latency p95, ms</td><td class="n">502.5</td><td class="n">498.9</td><td class="n">21.7</td><td class="n ours">20.1</td><td></td></tr>
+        <tr><td class="tag">S5</td><td>call</td><td>late frames, %</td><td class="n">92.9</td><td class="n">74.0</td><td class="n">21.4</td><td class="n ours">0.1</td><td>classifier, expected damage</td></tr>
+        <tr><td class="tag">S5</td><td>game</td><td>late frames, %</td><td class="n">0.0</td><td class="n">29.1</td><td class="n">0.0</td><td class="n ours">0.0</td><td></td></tr>
+        <tr><td class="tag">S6</td><td>call</td><td>late frames, %</td><td class="n">94.3</td><td class="n">94.4</td><td class="n">2.6</td><td class="n ours">1.7</td><td>classifier</td></tr>
+        <tr><td class="tag">S6</td><td>call</td><td>latency p95, ms</td><td class="n">1,785</td><td class="n">2,063</td><td class="n">24.4</td><td class="n ours">16.7</td><td></td></tr>
+        <tr><td class="tag">S7</td><td>game</td><td>late frames, %</td><td class="n">83.2</td><td class="n">19.4</td><td class="n">0.5</td><td class="n ours">0.6</td><td>classifier</td></tr>
+        <tr><td class="tag">S7</td><td>game</td><td>latency p95, ms</td><td class="n">925</td><td class="n">22.0</td><td class="n">17.9</td><td class="n ours">17.9</td><td></td></tr>
+        <tr><td class="tag">S8</td><td>call</td><td>late frames, %</td><td class="n">39.2</td><td class="n">23.6</td><td class="n">0.1</td><td class="n ours">0.0</td><td>classifier</td></tr>
+        <tr><td class="tag">S3</td><td>game</td><td>latency p95, ms</td><td class="n">17.6</td><td class="n">39.8</td><td class="n">17.1</td><td class="n ours">17.1</td><td>tie</td></tr>
+        <tr><td class="tag">S1, S4, S10</td><td>call, game</td><td>late frames, %</td><td class="n">0.0</td><td class="n">0.0</td><td class="n">0.0</td><td class="n ours">0.0</td><td>tie</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta">Download and stream throughput enter through the cost scale below, judged against the same flow under plain CAKE. Fairness between devices (Jain's index) and per-component CPU are not yet computed.</p>
+</section>
+
+<section class="wide">
+  <p class="eyebrow">Results on one scale</p>
+  <h2>Seven times fewer ruined flows than plain CAKE, on this scenario mix</h2>
+  <p>Summed over the nine scenarios, the full system leaves 0.73 flows unusable against plain CAKE's 5.58. That ratio depends on the scenario mix: four of the nine (S5 to S8) were written, or rewritten, after the damage measurements showed where CAKE fails. Read it as a summary of the table above, not as a claim about homes in general.</p>
   <figure>
     <img src="charts/total-cost.png" alt="Bar chart of damage summed over all nine scenarios, median of six seeds: no QoS 12.31, plain CAKE 5.58, CAKE with threshold rules 6.91, classifier by top label 1.65, full system 0.73." width="1280" height="576" loading="lazy">
     <figcaption>Per seed, the nine scenarios' costs are added up; the bar is the median over six seeds and the whisker its 95% bootstrap interval. The threshold rules do worse than plain CAKE: they push games and calls into Bulk.</figcaption>
@@ -237,6 +263,19 @@ flowchart LR
     <img src="charts/against-cake.png" alt="Three dot plots of the paired difference in summed cost between the full system and plain CAKE, threshold rules, and top label, with 95% intervals." width="1872" height="908" loading="lazy">
     <figcaption>Left of zero the full system is better. Against plain CAKE and the rules it is better or tied in every scenario. Against the simpler top-label rule it ties most scenarios and wins S5, where one backup connection sat just under top label's 80% bar for demotion and stayed in Best Effort beside the call.</figcaption>
   </figure>
+  <p><strong>Expected damage against top label is not yet proven live.</strong> The two tie everywhere except S5, and S5's margin comes from where a confidence bar fell, which is closer to a threshold effect than to the argument for expected damage. Offline the gap is clear (0.14 against 0.29 balanced expected damage), but the experiment that tests the argument directly, both rules run with a deliberately weakened classifier, is still to come.</p>
+</section>
+
+<section>
+  <p class="eyebrow">How fair is this test</p>
+  <h2>Where the system was tuned on what it is measured on</h2>
+  <p>Three changes to the system were made because an evaluation scenario exposed a problem: two corrections to how the damage table is scored, the bar on Voice, and the download-first rule in the capacity estimator. The smoke runs that found the first ones used seed 1, which is also one of the ten matrix seeds, and the estimator problem was found in matrix seed 0 itself. That is how a system gets fitted to its own test, so the final numbers will be reported three ways:</p>
+  <ul class="plain">
+    <li>On the matrix seeds, with seed 1 marked as a development seed.</li>
+    <li>On ten fresh seeds, 10 to 19, run once after the system is frozen, every configuration rerun, not only the ones that changed.</li>
+    <li>On one or two scenarios written after the freeze, run once and reported whatever happens.</li>
+  </ul>
+  <p>The comparison for S2 is also incomplete. It pits an adaptive shaper against a fixed one, which any adaptive shaper wins. The community standard, cake-autorate, will be added as configuration B3 on S2 and S5; matching it would make the claim "as good as the standard tool, built in".</p>
 </section>
 
 <section>
@@ -253,10 +292,46 @@ flowchart LR
     <img src="charts/offline.png" alt="Bar chart of balanced expected damage on recorded flows: qosify rules 1.99, tuned rules 0.75, LightGBM by top label 0.29, LightGBM by expected damage 0.14." width="1280" height="528" loading="lazy">
     <figcaption>Go/no-go check on 3,607 recorded flows from 370 sessions that no model trained on: public datasets (ISCX, Purdue video calls on current Zoom, Meet, Teams and Webex, UNSW cloud gaming, Labayen) and our own JioGamesCloud captures. Every class counts the same. qosify's defaults sent 89% of cloud-gaming flows to Bulk; the model sent none.</figcaption>
   </figure>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th class="n">Rules, qosify defaults</th><th class="n">Rules, tuned</th><th class="n ours">LightGBM</th><th class="n">Flows</th></tr></thead>
+      <tbody>
+        <tr><td>Accuracy</td><td class="n">0.46</td><td class="n">0.42</td><td class="n ours">0.94</td><td class="n">3,607</td></tr>
+        <tr><td>Macro-F1</td><td class="n">0.11</td><td class="n">0.10</td><td class="n ours">0.74</td><td class="n"></td></tr>
+        <tr><td>Calibration error</td><td class="n">–</td><td class="n">–</td><td class="n ours">0.05</td><td class="n"></td></tr>
+        <tr><td>Recall, voice call</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.74</td><td class="n">19</td></tr>
+        <tr><td>Recall, game and cloud game</td><td class="n">0.03</td><td class="n">0.69</td><td class="n ours">0.95</td><td class="n">111</td></tr>
+        <tr><td>Recall, video call</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">1.00</td><td class="n">443</td></tr>
+        <tr><td>Recall, streaming</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.91</td><td class="n">23</td></tr>
+        <tr><td>Recall, web and other</td><td class="n">0.58</td><td class="n">0.50</td><td class="n ours">0.95</td><td class="n">2,843</td></tr>
+        <tr><td>Recall, download</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.77</td><td class="n">67</td></tr>
+        <tr><td>Recall, background transfer</td><td class="n">0.14</td><td class="n">0.00</td><td class="n ours">0.78</td><td class="n">101</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta">The rules' recall is measured against the class whose tin they choose; they have three outputs, not seven, which is why their macro-F1 is so low. Their damage is the fairer comparison.</p>
+  <h3>Leave one source out</h3>
+  <p>Trained without one data source and tested on that source alone, the model does much worse on it. This is the largest risk on the machine-learning side: within a source the model is excellent, across sources it is not yet.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Left out</th><th>Class tested</th><th class="n">Flows</th><th class="n">Damage, source left out</th></tr></thead>
+      <tbody>
+        <tr><td>Purdue 2026 (Zoom, Meet, Teams, Webex)</td><td>video call</td><td class="n">437</td><td class="n">1.63</td></tr>
+        <tr><td>UNSW 2025 cloud gaming</td><td>game and cloud game</td><td class="n">97</td><td class="n">2.13</td></tr>
+        <tr><td>ISCX VPN-nonVPN 2016</td><td>download</td><td class="n">23</td><td class="n">2.23</td></tr>
+        <tr><td>ISCX VPN-nonVPN 2016</td><td>web and other</td><td class="n">229</td><td class="n">0.92</td></tr>
+        <tr><td>Own captures, JioGamesCloud</td><td>game and cloud game</td><td class="n">3</td><td class="n">0.80</td></tr>
+        <tr><td>Labayen 2020</td><td>streaming</td><td class="n">13</td><td class="n">0.48</td></tr>
+        <tr><td>ISCX Tor/non-Tor 2016</td><td>web and other</td><td class="n">1,591</td><td class="n">0.00</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta">With every source in training, the same classes score 0.00 to 0.03. The testbed source cannot be left out: some classes would have no training data at all.</p>
   <figure>
     <img src="charts/damage-table.png" alt="Heatmap of the measured damage table: seven traffic classes by four tins." width="1056" height="736" loading="lazy">
     <figcaption>The measured damage table the decision engine reads. A game in Bulk costs 6; a download in Video costs 4.5 because it hurts the calls beside it; a background transfer belongs in Bulk because anywhere else it takes upload a call needs.</figcaption>
   </figure>
+  <p><strong>How much the decisions hang on these numbers.</strong> The table has two seeds per cell and is rounded to half a point. Scaling every cell by a random 0.75 to 1.25 changes the tin of at most 2.1% of validation flows, and the expected damage barely moves (0.141 to at worst 0.146). Scaling leaves the many zero cells at zero, though, and those are where the table is weakest. Moving every cell by up to a whole point either way changes the tin of 14% of flows at the median and 39% at worst, and the damage rises to as much as 0.36: still half the tuned rules' 0.75, but the zeros matter. More seeds per cell would narrow this.</p>
 </section>
 
 <section>
@@ -276,7 +351,10 @@ flowchart LR
   <h2>What these numbers do not show</h2>
   <ul class="plain">
     <li><strong>Generated calls and games do not adapt their bitrate.</strong> Short of bandwidth, a real app lowers its quality; ours lose packets. "Plain CAKE breaks the call" is true, but how badly is the generator's.</li>
-    <li><strong>The model has partly learned the lab.</strong> Tested on a data source it never saw, it does much worse: video-call damage rises from 0.03 to 1.52 without the Purdue data. More sources per class is the remedy.</li>
+    <li><strong>The model has partly learned the lab.</strong> Tested on a data source it never saw, it does much worse (the leave-one-source-out table above). More sources per class is the remedy; six WhatsApp calls recorded this week are a start.</li>
+    <li><strong>Self-graded metric.</strong> The cost scale is the one the damage table, and so the decision engine, is built from. The raw measurements table is the evidence; the cost is a summary of it.</li>
+    <li><strong>Six seeds.</strong> A bootstrap interval from six pairs is unstable, and the smallest possible Wilcoxon p-value with six pairs is 0.031. Ten seeds and the A/A noise band come next.</li>
+    <li><strong>Not yet measured:</strong> CPU per component at 25, 50 and 100 Mbit/s; a flood of short flows (S9); fairness between devices; IPv6 traffic end to end (the marking is tested on IPv6, the scenarios run on IPv4); traffic inside a VPN.</li>
     <li><strong>One machine, one testbed.</strong> Rates from 25 to 100 Mbit/s on emulated links. Gigabit rates and real home hardware are untested.</li>
     <li><strong>Thresholds are judgements.</strong> What counts as an unusable call or a slowed download is written in a scoring file; the raw measurements are kept so other judgements can be applied without new runs.</li>
     <li><strong>The reclassifier is not yet stressed.</strong> In S8 the right tin never changes; the reclassifier mostly corrects first labels. A scenario where the right tin changes is still to be written.</li>
@@ -289,10 +367,11 @@ flowchart LR
   <h2>To finish the evidence</h2>
   <ol class="steps">
     <li>Seeds 6 to 9 of the matrix, then A/A runs of plain CAKE to measure noise between identical runs (Oct 15).</li>
-    <li>Rerun of the estimator configurations with the download-first fix.</li>
-    <li>Dataset v2 with six new WhatsApp voice and video calls from 2026, then retraining.</li>
-    <li>Open the sealed final test set of real captures, once.</li>
-    <li>Ablations: hysteresis, classify-once against reclassification, and expected damage against top label with a deliberately weakened classifier.</li>
+    <li>Freeze the system with the download-first fix. Rerun every configuration on fresh seeds 10 to 19, and run one or two scenarios written after the freeze, once.</li>
+    <li>cake-autorate as configuration B3 on S2 and S5.</li>
+    <li>Expected damage against top label with a deliberately weakened classifier: the test of the decision rule itself.</li>
+    <li>CPU per component; one call generator driven by a real congestion controller, so that "CAKE breaks the call" can be stated as the bitrate a real call would fall to.</li>
+    <li>Dataset v2 with six new WhatsApp calls, retraining, then open the sealed final test set of real captures, once.</li>
   </ol>
 </section>
 
