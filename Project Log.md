@@ -441,13 +441,13 @@ Also missing against the judging criteria: CPU per component at 25, 50 and 100 M
 
 Engineering is to finish by the evening of Fri Oct 16, so the writing team has a week with final numbers. Worked through autonomously; each step is ticked here when done.
 
-- [ ] Offline, while the matrix runs: demotion to Bulk needs evidence besides the model's confidence, tested on held-out sources (the 16% of unseen video-call records sent to Bulk)
-- [ ] Offline: trees, calibration and decision rule ported to Go, with an equivalence test against the Python service on every dataset record
-- [ ] Offline: dataset v2 with the six WhatsApp calls; retrain; go/no-go
-- [ ] Offline: cake-autorate set up as B3 (time-boxed to 2 h; if it will not run rootless, a stated limit)
-- [ ] Offline: one new scenario written for the post-freeze run, not run before the freeze
+- [x] Offline, while the matrix runs: demotion to Bulk needs evidence besides the model's confidence, tested on held-out sources. Done: no demotion on a flow's first packets, none for UDP. Held-out video calls, cloud games and downloads went to Bulk 0% of the time (16%, 2%, 10% before). Cost: UDP peer-to-peer stays in Best Effort; offline balanced damage 0.141 to 0.242, the rules 0.745
+- [x] Offline: trees, calibration and decision rule ported to Go (`internal/classify`, `cmd/aqos-classify`). On 2,000 dataset records the probabilities agree within 4.4e-16 and every tin is the same; over the socket, the same tin and reason for 300 of 300. About 6 µs per classification against 2 ms in Python. The final runs use it for O1 and O2
+- [x] Offline: dataset v2 with the six WhatsApp calls; LightGBM retrained (accuracy 0.972, macro-F1 0.80, temperature calibration); go/no-go go (0.239 against 0.745)
+- [x] Offline: cake-autorate v3.2.2 set up as B3, unmodified, in a private mount namespace; ran and set rates in a throwaway namespace. First testbed run is in the freeze's smoke check
+- [x] Offline: S11 written (50/10 line, call beside a download, console game beside an update, voice call beside a backup), not run before the freeze. Also: CPU per component recorded in every run, the weaker-classifier ablation option, the final-run matrix files and `scripts/final-runs.sh`
 - [ ] Matrix (`results-core`) finishes, about Thu 02:30; A/A runs (`results-aa`) about Thu 07:45
-- [ ] Freeze: one commit with everything; 15-minute smoke check of the frozen system
+- [ ] Freeze: unattended, by `scripts/freeze.sh`, started Wed 17:38 and waiting for the matrix and A/A runs. It fast-forwards main to the `freeze` branch, builds, runs `make check`, three smoke runs, then `scripts/final-runs.sh`. Its log is `freeze.log`; a failure is written to `FREEZE-STATUS`
 - [ ] Combined run, about 23 h: O1 and O2 on seeds 0-9 (they replace the pre-freeze ones; B0, B2, B4 are unaffected and kept), B2/B4/O1/O2 on fresh seeds 10-14, B3 on S2 and S5, the new scenario once
 - [ ] Weakened-classifier ablation; CPU per component
 - [ ] Open the sealed test set once; final report, charts, case study page and handover marked final; push notification to the owner
