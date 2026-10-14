@@ -1,0 +1,310 @@
+<title>Adaptive QoS Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of about 68 characters; figures and tables break out to a wider
+   measure. A lab notebook more than a brochure: the numbers carry the page. */
+:root {
+  --paper: #f6f7f5;
+  --sheet: #fcfcfb;          /* the charts' own surface */
+  --ink: #15171a;
+  --ink-2: #474b52;
+  --ink-3: #6e737b;
+  --rule: #d9dcd8;
+  --accent: #5242c4;         /* the full system's colour in every chart */
+  --accent-soft: #e9e6fb;
+  --cake: #2a78d6;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --measure: 44rem;
+  --wide: 64rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #131518; --sheet: #fcfcfb; --ink: #e9ebee; --ink-2: #b9bec6; --ink-3: #8c929b;
+    --rule: #2c3036; --accent: #9a8ff0; --accent-soft: #24213d; --cake: #5ea0ec;
+    --warn: #f0b552; --warn-soft: #2e2516; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #131518; --sheet: #fcfcfb; --ink: #e9ebee; --ink-2: #b9bec6; --ink-3: #8c929b;
+  --rule: #2c3036; --accent: #9a8ff0; --accent-soft: #24213d; --cake: #5ea0ec;
+  --warn: #f0b552; --warn-soft: #2e2516; color-scheme: dark;
+}
+
+body { background: var(--paper); color: var(--ink); font: 400 1.0625rem/1.65 var(--body); }
+.page { padding-inline: 1.25rem; padding-block: 3rem 5rem; display: grid; gap: 3.25rem; }
+.page > * { width: 100%; max-width: var(--measure); margin-inline: auto; }
+.page > .wide { max-width: var(--wide); }
+
+h1, h2, h3 { font-family: var(--display); line-height: 1.12; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.4rem, 6vw, 3.6rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 600; }
+h3 { font-size: 1.2rem; font-weight: 600; }
+p { margin: 0; }
+section, header { display: grid; gap: 1.1rem; }
+.eyebrow { font: 500 0.78rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.lede { font-size: 1.22rem; line-height: 1.55; color: var(--ink-2); }
+.meta { font: 400 0.85rem/1.5 var(--mono); color: var(--ink-3); }
+strong { font-weight: 600; }
+a { color: var(--accent); }
+code, .num { font-family: var(--mono); font-size: 0.9em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* The headline figures: the point of the page, so they lead. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); }
+.figure-cell { background: var(--paper); padding: 1.1rem 1.2rem 1.2rem; display: grid; gap: 0.35rem; align-content: start; }
+.figure-cell .big { font: 600 2.4rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.figure-cell .big.ours { color: var(--accent); }
+.figure-cell .what { font-size: 0.92rem; line-height: 1.45; color: var(--ink-2); }
+
+.status { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 0.9rem 1.1rem; font-size: 0.95rem; color: var(--ink); }
+
+/* Charts were drawn on a light surface; they keep it in either theme. */
+figure { margin: 0; display: grid; gap: 0.6rem; }
+figure img { width: 100%; height: auto; display: block; background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; }
+figcaption { font-size: 0.9rem; line-height: 1.5; color: var(--ink-2); }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); gap: 1.5rem; }
+.pair figure { min-width: 0; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 0.55rem 0.75rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--rule); }
+thead th { font: 500 0.75rem/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); background: var(--paper); }
+tbody tr:last-child td { border-bottom: 0; }
+td.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+td.ours, th.ours { color: var(--accent); font-weight: 600; }
+td.tag { white-space: nowrap; font-family: var(--mono); font-size: 0.82rem; }
+.win { color: var(--accent); } .tie { color: var(--ink-3); } .loss { color: var(--warn); }
+
+ol.steps, ul.plain { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; }
+ul.plain li::marker { color: var(--ink-3); }
+.finding { display: grid; gap: 0.35rem; padding-top: 0.9rem; border-top: 1px solid var(--rule); }
+.findings { display: grid; gap: 1.1rem; }
+pre.cmd { margin: 0; overflow-x: auto; padding: 1rem 1.1rem; border: 1px solid var(--rule); border-radius: 3px;
+  font: 400 0.85rem/1.6 var(--mono); background: var(--paper); color: var(--ink); }
+pre.mermaid { margin: 0; background: transparent; text-align: center; }
+.diagram { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; padding: 1rem; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<main class="page">
+
+<header>
+  <p class="eyebrow">Teliport Season 4 · case study · interim, 6 of 10 seeds</p>
+  <h1>Adaptive QoS Engine</h1>
+  <p class="lede">A home router that recognises a video call, a game or a download from packet sizes and timing alone, and puts each in the right priority queue of Linux CAKE. On the same traffic, it leaves seven times fewer flows unusable than plain CAKE, and it never once did worse than the hand-written threshold rules that existing tools use.</p>
+  <p class="meta">Measured Oct 13–14, 2026 · 270 runs, all valid · reference laptop: Fedora 43, kernel 7.2.8, 16 cores</p>
+</header>
+
+<section class="wide" aria-label="Headline results">
+  <div class="figures">
+    <div class="figure-cell"><span class="big ours num">0.73</span><span class="what">flows left unusable over all nine scenarios with the full system. Plain CAKE: <span class="num">5.58</span>. Rules: <span class="num">6.91</span>. No QoS: <span class="num">12.31</span>.</span></div>
+    <div class="figure-cell"><span class="big ours num">87%</span><span class="what">less damage than plain CAKE, the router setup this project has to beat. Median of six seeds.</span></div>
+    <div class="figure-cell"><span class="big ours num">53 / 54</span><span class="what">scenario runs in which it did as well as plain CAKE or better: 29 wins, 24 ties, 1 loss (cause found and fixed, see below).</span></div>
+    <div class="figure-cell"><span class="big ours num">94% → 2%</span><span class="what">late frames of an HD video call on a laptop that is also sharing files (scenario S6), plain CAKE against the full system.</span></div>
+  </div>
+</section>
+
+<p class="status"><strong>Interim.</strong> Six of the ten planned seeds are in. The last four, a set of A/A runs to measure noise between identical runs, and a rerun with one fix to the capacity estimator finish on Oct 15. Numbers will tighten; on six seeds the direction is already clear. The final test set of real captures has not been opened yet, by design.</p>
+
+<section>
+  <p class="eyebrow">The problem</p>
+  <h2>Fair queueing cannot tell which flow is the call</h2>
+  <p>CAKE is the best queue manager a home router can run. It shapes traffic just under the line rate so queues stay short, shares the link fairly between devices, and then fairly between each device's connections. For most homes, most of the time, that is enough: a call on one laptop survives a download on another.</p>
+  <p>It stops being enough when the call shares its device with bulk traffic. A laptop on a video call while a file-sharing client keeps ten connections open gives the call one eleventh of that laptop's share, far less than an HD call needs. Fair queueing has no way to know which of the eleven is the call. CAKE does have four priority queues, called tins (Voice, Video, Best Effort, Bulk), but something has to decide which flow goes in which.</p>
+  <p>Existing tools decide with thresholds: a flow with a high packet rate is bulk, small packets are priority. That rule mistakes an HD video call (400 to 600 packets a second) and a cloud-gaming stream (over 1,000) for downloads, and demotes exactly the traffic it should protect. qosify's own documentation describes the cloud-gaming case.</p>
+  <p>This project replaces the thresholds with a small trained classifier, and replaces "pick the most likely class" with "pick the tin that does the least expected damage".</p>
+</section>
+
+<section>
+  <p class="eyebrow">How it works</p>
+  <h2>From eight packets to a tin, in a few milliseconds</h2>
+  <p>A controller on the router watches the headers of each new flow's first eight packets: sizes, directions and the gaps between them. No payload, no addresses leave the controller. A LightGBM model turns them into a probability for each of seven traffic classes in about 1.4 ms (95th percentile 4.3 ms). A decision engine then multiplies those probabilities by a measured damage table and picks the tin with the lowest expected damage. A safety shield checks every proposal against fixed bounds before the enforcer writes it as a connection mark, which CAKE reads for every packet.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  P["First 8 packets<br/>sizes and gaps"] --> C["Classifier<br/>7 class probabilities"]
+  C --> D["Decision engine<br/>lowest expected damage"]
+  T[("Measured<br/>damage table")] --> D
+  D --> S{"Safety shield"}
+  S -->|accept| E["Conntrack mark"] --> K["CAKE tin"]
+  S -->|reject| U["Left to plain CAKE"]
+  R["Reclassifier<br/>class envelopes"] -.-> C
+  V["QoE verifier<br/>rollback"] -.-> S
+  Q["Capacity estimator<br/>delay probes"] -.-> S
+  W["Watchdog"] -.->|"2 s silence"| U
+</pre>
+  </div>
+  <ul class="plain">
+    <li><strong>Expected damage, not top label.</strong> At 45% video call and 55% download, top label sends the flow to Bulk, which ruins it if it is the call. Expected damage weighs that risk and keeps it out of Bulk. Demotion to Bulk, and since this week promotion to Voice, each need the model to be sure.</li>
+    <li><strong>The damage table is measured, not guessed.</strong> Each of seven classes was forced into each of four tins beside a call, a stream, a download and a peer-to-peer transfer, under three conditions, two seeds each: 240 runs.</li>
+    <li><strong>Reclassifier.</strong> Once a second each labelled flow is compared with its class's normal range. A flow that leaves it is asked about again; one that stays inside costs nothing.</li>
+    <li><strong>Capacity estimator.</strong> Probes three reflectors every 100 ms and lowers CAKE's rate when the line slows, so the queue stays where CAKE can manage it.</li>
+    <li><strong>Verifier.</strong> Ten seconds after a risky change it compares queue delay before and after, and undoes the change if things got worse in both windows.</li>
+    <li><strong>Fail-safe.</strong> If the controller dies, a separate watchdog returns the router to plain CAKE. In the experiments this took 2.02 to 2.03 s, every time (limit 3 s).</li>
+  </ul>
+</section>
+
+<section>
+  <p class="eyebrow">The experiment</p>
+  <h2>Nine home situations, five router setups, same traffic</h2>
+  <p>Everything runs in a testbed built from network namespaces on one laptop: home devices, the router, an ISP bottleneck with a deep buffer, and the far-end servers. Traffic programs imitate real applications and measure every packet: when it was sent, whether it arrived, whether its video or game frame made its deadline. Each run is 200 seconds of real traffic in real time.</p>
+  <p>A seed fixes every random choice (bitrates, packet sizes, ports, timings), so the five router setups are compared on identical traffic, seed against seed.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Setup</th><th>What the router does</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">B0</td><td>Nothing. One deep queue at the modem.</td></tr>
+        <tr><td class="tag">B2</td><td>Plain CAKE at 95% of the line rate. The floor to beat.</td></tr>
+        <tr><td class="tag">B4</td><td>CAKE plus threshold rules, qosify's own defaults.</td></tr>
+        <tr><td class="tag">O1</td><td>CAKE plus the classifier, choosing the tin of the most likely class.</td></tr>
+        <tr><td class="tag ours">O2</td><td>The full system: classifier, expected damage, reclassifier, verifier, capacity estimator.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>How damage is counted.</strong> Each flow gets a cost from 0 (as good as it gets) to 1 (unusable): for a call or a game, from late frames, loss, latency and jitter; for a stream, from stalls and lost bitrate; for a download, from lost throughput against the same download under plain CAKE. A scenario's cost is the sum over its flows, so 1.0 means one flow ruined.</p>
+</section>
+
+<section class="wide">
+  <p class="eyebrow">Results</p>
+  <h2>Seven times fewer ruined flows than plain CAKE</h2>
+  <figure>
+    <img src="charts/total-cost.png" alt="Bar chart of damage summed over all nine scenarios, median of six seeds: no QoS 12.31, plain CAKE 5.58, CAKE with threshold rules 6.91, classifier by top label 1.65, full system 0.73." width="1280" height="576" loading="lazy">
+    <figcaption>Per seed, the nine scenarios' costs are added up; the bar is the median over six seeds and the whisker its 95% bootstrap interval. The threshold rules do worse than plain CAKE: they push games and calls into Bulk.</figcaption>
+  </figure>
+  <figure>
+    <img src="charts/cost-by-scenario.png" alt="Nine small bar charts, one per scenario, comparing the five router setups." width="1760" height="1360" loading="lazy">
+    <figcaption>Scenario by scenario. The full system wins S2, S5, S6, S7 and S8, and ties S1, S3, S4 and S10.</figcaption>
+  </figure>
+</section>
+
+<section class="wide">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>What happens</th><th class="n">No QoS</th><th class="n">CAKE</th><th class="n">Rules</th><th class="n">Top label</th><th class="n ours">Full system</th><th>vs CAKE</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">S1</td><td>Large download starts during a video call</td><td class="n">1.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.00</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S2</td><td>Line drops from 100 to 20 Mbit/s mid-call</td><td class="n">1.00</td><td class="n">1.00</td><td class="n">1.00</td><td class="n">0.00</td><td class="n ours">0.00</td><td class="win">better</td></tr>
+        <tr><td class="tag">S3</td><td>Three TVs streaming and a game console</td><td class="n">1.27</td><td class="n">0.27</td><td class="n">0.40</td><td class="n">0.27</td><td class="n ours">0.27</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S4</td><td>Cloud backup fills the upload during a game</td><td class="n">1.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.00</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S5</td><td>Work call on a laptop that is backing up, busy evening, priority lease</td><td class="n">2.27</td><td class="n">1.27</td><td class="n">2.29</td><td class="n">1.11</td><td class="n ours">0.27</td><td class="win">better</td></tr>
+        <tr><td class="tag">S6</td><td>HD video call on a laptop that is also sharing files</td><td class="n">1.37</td><td class="n">1.00</td><td class="n">1.00</td><td class="n">0.09</td><td class="n ours">0.04</td><td class="win">better</td></tr>
+        <tr><td class="tag">S7</td><td>Cloud game on a PC that is also fetching a game update</td><td class="n">1.09</td><td class="n">1.09</td><td class="n">1.09</td><td class="n">0.10</td><td class="n ours">0.11</td><td class="win">better</td></tr>
+        <tr><td class="tag">S8</td><td>Camera off and on, lobby to match, download paused</td><td class="n">2.30</td><td class="n">1.05</td><td class="n">1.16</td><td class="n">0.09</td><td class="n ours">0.09</td><td class="win">better</td></tr>
+        <tr><td class="tag">S10</td><td>Probe targets go silent, then the controller is killed</td><td class="n">1.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n">0.00</td><td class="n ours">0.00</td><td class="tie">tie</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="meta">Summed cost per scenario, median of six seeds. "Better" means the 95% interval of the seed-by-seed difference lies wholly below zero.</p>
+</section>
+
+<section class="wide">
+  <h2>What a person on the call would have seen</h2>
+  <figure>
+    <img src="charts/late-frames.png" alt="Small bar charts of the share of video or game frames that arrived too late, per scenario and router setup." width="1776" height="1360" loading="lazy">
+    <figcaption>Share of frames that arrived after their deadline (100 ms for calls, 50 ms for games). Above about 5% a call visibly stutters; above 20% it is unusable.</figcaption>
+  </figure>
+  <div class="pair">
+    <figure>
+      <img src="charts/timeline-S6.png" alt="Line chart: under plain CAKE the call's late frames jump to 100% when file sharing starts at 30 seconds and stay there; under the full system they stay near zero." width="1440" height="624" loading="lazy">
+      <figcaption>S6, one run. When the file-sharing client starts, plain CAKE gives the call one share among eleven and almost every frame is late from then on. The full system had put the call in Video at 0.0 s.</figcaption>
+    </figure>
+    <figure>
+      <img src="charts/timeline-S7.png" alt="Line chart: under plain CAKE the cloud game's late frames jump to 100% when the update starts; under the full system a short spike then near zero." width="1440" height="624" loading="lazy">
+      <figcaption>S7, one run. The game update starts eight connections on the same PC. The full system shows one short spike while the capacity estimator reacts to the burst, then nothing.</figcaption>
+    </figure>
+    <figure>
+      <img src="charts/timeline-S2.png" alt="Line chart of the call during a drop in line rate." width="1440" height="624" loading="lazy">
+      <figcaption>S2, one run. The line falls to a fifth of its speed. A fixed shaper is now above the line and the modem's buffer fills; the capacity estimator detects the drop in about 350 ms and moves CAKE under the new rate.</figcaption>
+    </figure>
+    <figure>
+      <img src="charts/timeline-S8.png" alt="Line chart of the call in scenario S8 with its events marked." width="1440" height="624" loading="lazy">
+      <figcaption>S8, one run. Plain CAKE's call suffers whenever bulk traffic shares its laptop; under the full system it stays clean through every change.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="wide">
+  <h2>Against each rival, seed by seed</h2>
+  <figure>
+    <img src="charts/against-cake.png" alt="Three dot plots of the paired difference in summed cost between the full system and plain CAKE, threshold rules, and top label, with 95% intervals." width="1872" height="908" loading="lazy">
+    <figcaption>Left of zero the full system is better. Against plain CAKE and the rules it is better or tied in every scenario. Against the simpler top-label rule it ties most scenarios and wins S5, where one backup connection sat just under top label's 80% bar for demotion and stayed in Best Effort beside the call.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <p class="eyebrow">Where it does not help</p>
+  <h2>Four ties, and why they are expected</h2>
+  <p>In S1, S3, S4 and S10 every interactive flow is alone on its device. CAKE's fairness between devices already protects it, so no tin assignment can improve on plain CAKE, and none of the methods does. The damage measurements predicted this before the scenarios ran: alone on its device, a call or a game is unharmed in any tin except Bulk.</p>
+  <p>The claim this project can defend is therefore narrower than "beats CAKE everywhere", and sharper: <strong>the classifier beats plain CAKE when an interactive flow shares its device with bulk traffic, and the capacity estimator beats it when the line's speed changes. Elsewhere it ties CAKE, and it never does worse than the threshold rules.</strong></p>
+</section>
+
+<section>
+  <p class="eyebrow">Before any live traffic</p>
+  <h2>The classifier on recorded flows</h2>
+  <figure>
+    <img src="charts/offline.png" alt="Bar chart of balanced expected damage on recorded flows: qosify rules 1.99, tuned rules 0.75, LightGBM by top label 0.29, LightGBM by expected damage 0.14." width="1280" height="528" loading="lazy">
+    <figcaption>Go/no-go check on 3,607 recorded flows from 370 sessions that no model trained on: public datasets (ISCX, Purdue video calls on current Zoom, Meet, Teams and Webex, UNSW cloud gaming, Labayen) and our own JioGamesCloud captures. Every class counts the same. qosify's defaults sent 89% of cloud-gaming flows to Bulk; the model sent none.</figcaption>
+  </figure>
+  <figure>
+    <img src="charts/damage-table.png" alt="Heatmap of the measured damage table: seven traffic classes by four tins." width="1056" height="736" loading="lazy">
+    <figcaption>The measured damage table the decision engine reads. A game in Bulk costs 6; a download in Video costs 4.5 because it hurts the calls beside it; a background transfer belongs in Bulk because anywhere else it takes upload a call needs.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <p class="eyebrow">What we learned</p>
+  <h2>Most improvements came from scenarios exposing a wrong assumption</h2>
+  <div class="findings">
+    <div class="finding"><h3>A tin only matters when the flow has company on its device</h3><p>The first damage measurements had every flow alone on its device, and every tin looked almost the same. A cloud game on a PC fetching an update got 0.6 of its 16.7 Mbit/s in Best Effort and all of it in Video. That reshaped the scenarios and the claim.</p></div>
+    <div class="finding"><h3>The damage table is a model of what matters, and it was wrong three times</h3><p>Each gap was found by a scenario: no reward for demoting a backup beside a call; a call apparently better off in Bulk because ruining it freed room for another call; Voice rated harmless for everything because each flow was measured there alone. The last one made the full system lose S7 in the first smoke run (51% late frames) until Voice was limited to flows the model is over 50% sure are calls or games. After that fix, in the smoke run, the full system matched or beat every rival on every scenario.</p></div>
+    <div class="finding"><h3>Round-trip probes cannot tell which way the queue is</h3><p>The one run where the full system lost to plain CAKE (S5, seed 0) had three streams queueing on the way down while the estimator also cut the upload, eleven times, to 2.2 Mbit/s on a 5 Mbit/s line, and the call no longer fitted. The fix cuts the download first, since its queue can be measured, and the upload only if the delay outlasts that by two seconds. It is tested and is being rerun.</p></div>
+    <div class="finding"><h3>With nothing to go on, do nothing</h3><p>The first design sent the shaper to a low fixed rate when the probe targets stopped answering. In S10 the link was fine and only the targets were gone, and the fallback broke a call. The estimator now holds its rate while deaf, and S10 costs nothing.</p></div>
+    <div class="finding"><h3>Simulations shared their author's blind spots</h3><p>The capacity estimator passed every test against a simulated link and failed four times on the real one: slow answers counted as lost, a rate parked just above the link, a cut sized by a quiet second before a burst, unreachable targets read as delay. All four are now regression tests.</p></div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">Limits</p>
+  <h2>What these numbers do not show</h2>
+  <ul class="plain">
+    <li><strong>Generated calls and games do not adapt their bitrate.</strong> Short of bandwidth, a real app lowers its quality; ours lose packets. "Plain CAKE breaks the call" is true, but how badly is the generator's.</li>
+    <li><strong>The model has partly learned the lab.</strong> Tested on a data source it never saw, it does much worse: video-call damage rises from 0.03 to 1.52 without the Purdue data. More sources per class is the remedy.</li>
+    <li><strong>One machine, one testbed.</strong> Rates from 25 to 100 Mbit/s on emulated links. Gigabit rates and real home hardware are untested.</li>
+    <li><strong>Thresholds are judgements.</strong> What counts as an unusable call or a slowed download is written in a scoring file; the raw measurements are kept so other judgements can be applied without new runs.</li>
+    <li><strong>The reclassifier is not yet stressed.</strong> In S8 the right tin never changes; the reclassifier mostly corrects first labels. A scenario where the right tin changes is still to be written.</li>
+    <li><strong>Real calls switch relays.</strong> A WhatsApp video call we captured moved to another relay 12 s after starting, which a live router sees as a new flow whose first packets are probes.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="eyebrow">Next</p>
+  <h2>To finish the evidence</h2>
+  <ol class="steps">
+    <li>Seeds 6 to 9 of the matrix, then A/A runs of plain CAKE to measure noise between identical runs (Oct 15).</li>
+    <li>Rerun of the estimator configurations with the download-first fix.</li>
+    <li>Dataset v2 with six new WhatsApp voice and video calls from 2026, then retraining.</li>
+    <li>Open the sealed final test set of real captures, once.</li>
+    <li>Ablations: hysteresis, classify-once against reclassification, and expected damage against top label with a deliberately weakened classifier.</li>
+  </ol>
+</section>
+
+<section>
+  <p class="eyebrow">Reproduce</p>
+  <h2>Every number on this page from one repository</h2>
+  <pre class="cmd">make check                         # 200+ unit tests, Go and Python
+make testbed-check                 # 16 tests against the real testbed
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.run matrix configs/matrix-core.yaml --results results-core
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.report --results results-core --out reports/core.md
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.charts --results results-core --out reports/charts</pre>
+  <p class="meta">Rootless: no sudo needed for any experiment. Model lgbm-v1-fe91bbad, dataset v1 (sha256 fe91bbad5e5e), measured damage table with two seeds per cell.</p>
+</section>
+
+</main>
