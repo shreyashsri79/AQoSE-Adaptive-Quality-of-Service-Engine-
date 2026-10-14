@@ -451,7 +451,7 @@ Engineering is to finish by the evening of Fri Oct 16, so the writing team has a
 - [ ] Combined run, about 23 h: O1 and O2 on seeds 0-9 (they replace the pre-freeze ones; B0, B2, B4 are unaffected and kept), B2/B4/O1/O2 on fresh seeds 10-14, B3 on S2 and S5, the new scenario once
 - [ ] Weakened-classifier ablation; CPU per component
 - [ ] Open the sealed test set once; final report, charts, case study page and handover marked final
-- [ ] Full project report as LaTeX, `reports/paper/aqose-report.tex`, compiled to PDF with `latexmk -pdf` (pdflatex is installed): the problem, the system, the classifier and why LightGBM, the decision rule, the method, final results with the charts, ablation, CPU, limits. Asked for by the owner on Oct 15, for the afternoon of Oct 16
+- [ ] Full project report as LaTeX, `reports/paper/aqose-report.tex`, compiled to PDF with `latexmk -pdf` (pdflatex is installed): the problem, the system, the classifier and why LightGBM, the decision rule, the method, final results with the charts, ablation, CPU, limits. Asked for by the owner early on Oct 15: a draft by that afternoon with interim numbers marked, then filled with the final numbers once the final runs end (Oct 16)
 - [ ] One-slide reference for the design team (artifact https://claude.ai/artifact/8CVcLAHVWMav3HLAtYp11x; source in `reports/one-slide/`): final numbers in place of the interim ones, the "interim" labels removed, the QR code and the link to the report PDF in the header's report box
 - [ ] Push notification to the owner when all of the above is done
 
