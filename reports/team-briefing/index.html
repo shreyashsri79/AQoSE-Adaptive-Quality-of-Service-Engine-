@@ -1,0 +1,341 @@
+<title>AQoSE Team Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one calm reading column for teammates who are not networking people; tables and charts
+   step out to a wider measure. Status colours mean done / running / next, nothing else. */
+:root {
+  --paper: #f6f7fa;
+  --sheet: #fcfcfb;
+  --ink: #171a2b;
+  --muted: #4b5064;
+  --faint: #737890;
+  --line: #dcdfe8;
+  --accent: #5242c4;
+  --accent-soft: #ebe8fb;
+  --done: #1d7a52;
+  --done-soft: #e2f3ea;
+  --run: #9a5800;
+  --run-soft: #fbefd9;
+  --next: #4b5064;
+  --next-soft: #eceef3;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", Arial, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", Verdana, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --measure: 42rem;
+  --wide: 62rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12141f; --sheet: #fcfcfb; --ink: #eceef5; --muted: #b0b5c7; --faint: #8b90a6; --line: #2a2e42;
+    --accent: #a69cf4; --accent-soft: #24213f; --done: #5cc99a; --done-soft: #15291f; --run: #f0b552;
+    --run-soft: #2d2414; --next: #b0b5c7; --next-soft: #20232f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12141f; --sheet: #fcfcfb; --ink: #eceef5; --muted: #b0b5c7; --faint: #8b90a6; --line: #2a2e42;
+  --accent: #a69cf4; --accent-soft: #24213f; --done: #5cc99a; --done-soft: #15291f; --run: #f0b552;
+  --run-soft: #2d2414; --next: #b0b5c7; --next-soft: #20232f; color-scheme: dark;
+}
+
+body { background: var(--paper); color: var(--ink); font: 400 1.0625rem/1.65 var(--body); }
+.page { padding-inline: 1.25rem; padding-block: 2.75rem 5rem; display: grid; gap: 3.5rem; }
+.page > * { width: 100%; max-width: var(--measure); margin-inline: auto; min-width: 0; }
+.page > .wide { max-width: var(--wide); }
+h1, h2, h3 { font-family: var(--display); line-height: 1.12; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.3rem, 6vw, 3.4rem); font-weight: 700; letter-spacing: -0.015em; }
+h2 { font-size: 1.7rem; font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 600; }
+p { margin: 0; }
+section, header { display: grid; gap: 1rem; }
+a { color: var(--accent); }
+strong { font-weight: 700; }
+.kicker { font: 500 0.78rem/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.lede { font-size: 1.2rem; line-height: 1.55; color: var(--muted); }
+.note { font-size: 0.92rem; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 0.88em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Status: the first thing a teammate wants to know. */
+.status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.status-list li { display: grid; grid-template-columns: 6.2rem 1fr; gap: 0.9rem; align-items: baseline; }
+.pill { font: 500 0.74rem/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 0.38rem 0.55rem;
+  border-radius: 999px; text-align: center; white-space: nowrap; }
+.pill.done { color: var(--done); background: var(--done-soft); }
+.pill.run { color: var(--run); background: var(--run-soft); }
+.pill.next { color: var(--next); background: var(--next-soft); }
+.status-list li > span:last-child { min-width: 0; }
+
+/* The four steps: a real sequence, so they are numbered. */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; counter-reset: step; }
+.steps li { display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.9rem; counter-increment: step; }
+.steps li::before { content: counter(step); font: 700 1.6rem/1 var(--display); color: var(--accent); padding-top: 0.15rem; }
+.steps li > div { display: grid; gap: 0.25rem; min-width: 0; }
+
+.example { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 1rem 1.15rem; display: grid; gap: 0.5rem; }
+
+.big-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); gap: 1.6rem 2rem; }
+.big { display: grid; gap: 0.3rem; align-content: start; }
+.big b { font: 700 2.2rem/1 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.big span { font-size: 0.93rem; line-height: 1.45; color: var(--muted); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 0.6rem 0.8rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+thead th { font: 500 0.74rem/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); background: var(--paper); }
+tbody tr:last-child td { border-bottom: 0; }
+td.n { text-align: right; white-space: nowrap; }
+td.tag { font-family: var(--mono); font-size: 0.85rem; white-space: nowrap; }
+.win { color: var(--done); font-weight: 700; }
+.tie { color: var(--faint); }
+
+/* Timeline: dates down the left, events on the right. */
+.timeline { display: grid; gap: 0; border-left: 2px solid var(--line); margin-left: 0.4rem; }
+.day { display: grid; gap: 0.45rem; padding: 0 0 1.5rem 1.4rem; position: relative; }
+.day::before { content: ""; position: absolute; left: -0.45rem; top: 0.45rem; width: 0.8rem; height: 0.8rem; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--accent); }
+.day.future::before { border-color: var(--faint); border-style: dashed; }
+.day .when { font: 500 0.8rem/1.3 var(--mono); letter-spacing: 0.05em; color: var(--accent); text-transform: uppercase; }
+.day.future .when { color: var(--faint); }
+.day ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.35rem; }
+
+figure { margin: 0; display: grid; gap: 0.55rem; }
+figure img { width: 100%; height: auto; display: block; background: var(--sheet); border: 1px solid var(--line); border-radius: 4px; }
+figcaption { font-size: 0.92rem; line-height: 1.5; color: var(--muted); }
+
+dl.terms { margin: 0; display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; gap: 0.75rem 1.4rem; }
+dl.terms dt { font-weight: 700; }
+dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
+@media (max-width: 34rem) { dl.terms { grid-template-columns: 1fr; gap: 0.2rem; } dl.terms dd { margin-bottom: 0.7rem; } }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.5rem 2.2rem; }
+.two > div { display: grid; gap: 0.6rem; align-content: start; min-width: 0; }
+.two ul, ul.plain { margin: 0; padding-left: 1.15rem; display: grid; gap: 0.45rem; }
+.say h3 { color: var(--done); } .dont h3 { color: var(--run); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<main class="page">
+
+<header>
+  <p class="kicker">For the AQoSE team · Thursday Oct 15, 2026 · internal, not the submission</p>
+  <h1>What AQoSE is, and what happened this week</h1>
+  <p class="lede">A plain-language walk-through of the project for everyone on the team: the problem, how our system works, how we tested it, what the tests show so far, and what is still running. No networking background needed.</p>
+  <p class="note">The numbers on this page are from the main experiment, which finished this morning. They are close to final but not final: the frozen system is being re-tested right now, and those results replace these on Friday.</p>
+</header>
+
+<section>
+  <p class="kicker">Right now</p>
+  <h2>Where things stand</h2>
+  <ul class="status-list">
+    <li><span class="pill done">Done</span><span>The system is built, trained and tested: 450 test runs plus 90 noise-check runs, every one valid.</span></li>
+    <li><span class="pill done">Done</span><span>The system was <strong>frozen</strong> at 07:41 today: no more changes to it, so the final tests are fair.</span></li>
+    <li><span class="pill run">Running</span><span>Final tests of the frozen system, including fresh test settings and a brand-new home situation. Ends around <strong>Fri Oct 16, 9 AM</strong>.</span></li>
+    <li><span class="pill run">Waiting</span><span>Real WhatsApp video calls replayed in the test network, to check the system works on real traffic and not only on our own fake traffic. Starts by itself after the final tests; ends around <strong>Fri noon</strong>.</span></li>
+    <li><span class="pill next">Next</span><span>Final report (PDF) and the one-slide summary with final numbers: <strong>Friday afternoon or evening</strong>. Submission deadline: <strong>Oct 23</strong>.</span></li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">The problem</p>
+  <h2>Your video call freezes because your own laptop is busy</h2>
+  <p>Picture this: you are on a video call, and the same laptop is uploading photos to Google Drive, or downloading a big game update. The call starts to freeze and stutter, even though your internet plan is fast enough for both.</p>
+  <p>Home routers decide which data goes out first. The best free software for this is called <strong>CAKE</strong>. CAKE is fair: it splits the internet line evenly between devices, and then evenly between each device's connections. That works well most of the time. But when your laptop has twenty connections open for the upload and one for the call, the call gets one twentieth of the laptop's share. That is not enough for video.</p>
+  <p>CAKE does have four priority lanes, called <strong>tins</strong>: Voice (fastest), Video, Best Effort (normal) and Bulk (slowest). The trouble is that something has to tell CAKE which connection is the call. Existing tools guess with simple rules such as "lots of packets per second means it's a download". Video calls and cloud games also send lots of packets, so those rules push exactly the wrong things into the slow lane.</p>
+</section>
+
+<section>
+  <p class="kicker">Our idea</p>
+  <h2>Recognise each connection, then pick its lane</h2>
+  <p>AQoSE (Adaptive QoS Engine) is an add-on for routers that already run CAKE. CAKE keeps doing all the actual traffic handling. AQoSE only does one thing: it tells CAKE which lane each connection belongs in. It does this for every new connection, in four steps.</p>
+  <ol class="steps">
+    <li><div><h3>Listen</h3><p>It looks at the first 8 packets of a new connection: how big each one is and how far apart they come. Only these outside details, never the content. Think of recognising a friend by their footsteps without seeing their face.</p></div></li>
+    <li><div><h3>Predict</h3><p>A small trained model (37 decision trees, made with a tool called LightGBM) turns those numbers into odds for seven kinds of traffic: voice call, game, video call, streaming, web browsing, download and background transfer.</p></div></li>
+    <li><div><h3>Decide</h3><p>It picks the lane that would do the least harm, given those odds. How bad each wrong choice is was measured in our tests, not guessed. Safety rules sit on top: nothing goes to the slow lane unless the model is over 80% sure, never on its first packets alone, and never a UDP connection, the kind calls and games use.</p></div></li>
+    <li><div><h3>Watch</h3><p>Every second it checks that each connection still behaves like what it was labelled. If it changes, it is checked again. If a change made delays worse, the change is undone.</p></div></li>
+  </ol>
+  <div class="example">
+    <p><strong>An example of "least harm".</strong> Say the model is 55% sure a connection is a backup and 45% sure it is a game. Putting it in the slow lane is a gamble: if it really is the game, the game becomes unplayable. So AQoSE keeps it in a protected lane. If it is the backup after all, the backup only runs a little slower. A small cost, instead of a ruined game.</p>
+  </div>
+  <p><strong>The safety net.</strong> Every decision passes a fixed safety check before it is applied, and a separate "watchdog" program puts the router back to plain CAKE within about 2 seconds if AQoSE crashes. So the worst case is what people have today.</p>
+  <p class="note">An honest note from the reviews: most of the improvement comes from the model recognising the traffic at all (step 2). The "least harm" rule in step 3 adds a further gain and mainly acts as a safety refinement. In the write-up we lead with the recognising.</p>
+</section>
+
+<section>
+  <p class="kicker">How we tested it</p>
+  <h2>A whole fake home network inside one laptop</h2>
+  <p>We could not test on hundreds of real homes, so we built a <strong>testbed</strong>: a pretend home network that runs inside one laptop. It has pretend devices (a laptop, a PC, a TV, a phone), a router, an internet line that we can make fast or slow, and pretend servers on the internet side. Programs on the devices act like real apps (video calls, games, downloads, streaming) and record whether every single packet and video frame arrived in time. People call this <strong>emulation</strong>.</p>
+  <p>We wrote <strong>9 home situations</strong> (called scenarios, S1 to S10) and ran each one with <strong>5 different router setups</strong>, 10 times each with different random details (called <strong>seeds</strong>). The same seed gives exactly the same traffic for every setup, so the comparison is fair: same test, different router.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Router setup</th><th>Plain meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">B0</td><td>No QoS</td><td>What a cheap router does: one big queue, no management at all</td></tr>
+        <tr><td class="tag">B2</td><td>Plain CAKE</td><td>The best free option today. The one we have to beat</td></tr>
+        <tr><td class="tag">B3</td><td>CAKE + cake-autorate</td><td>A popular community add-on that adjusts CAKE when the line speed changes. Added in the final tests</td></tr>
+        <tr><td class="tag">B4</td><td>CAKE + threshold rules</td><td>How existing tools (qosify) sort traffic: simple rules about packet rates and sizes</td></tr>
+        <tr><td class="tag">O1</td><td>CAKE + our model, simple choice</td><td>Our model, but it just picks the lane of the most likely type of traffic</td></tr>
+        <tr><td class="tag">O2</td><td><strong>AQoSE, the full system</strong></td><td>Our model, the "least harm" rule, the watching and all the safety parts</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Each run lasts 200 seconds in real time, and there were 450 of them, about 27 hours of testing. We also ran 90 <strong>A/A runs</strong>: the same setup twice with the same seed, to see how much results wobble by chance. Answer: almost not at all. In 8 of the 9 situations, two identical runs gave exactly the same score.</p>
+</section>
+
+<section class="wide">
+  <p class="kicker">Results so far</p>
+  <h2>It fixes the case CAKE gets wrong, and ties it everywhere else</h2>
+  <p style="max-width: var(--measure)">"Late frames" means video or game frames that arrived too late to show, so the picture freezes or stutters. Above about 5% a call visibly stutters; above 20% it is unusable. Numbers below are the middle value over 10 repeats.</p>
+  <div class="big-row">
+    <div class="big"><b>94% → 1.7%</b><span>late frames on an HD video call while the same laptop shares files (S6). Plain CAKE, then AQoSE.</span></div>
+    <div class="big"><b>83% → 0.7%</b><span>late frames on a cloud game while the same PC downloads a game update (S7).</span></div>
+    <div class="big"><b>93% → 0.2%</b><span>late frames on a work call on a busy evening at home, with a backup running (S5).</span></div>
+    <div class="big"><b>0 of 90</b><span>test pairs where AQoSE did worse than the threshold rules existing tools use. It won 52 and tied 38.</span></div>
+  </div>
+  <figure>
+    <img src="charts/timeline-S7.png" alt="Line chart of a cloud game over time. With plain CAKE, late frames jump to almost 100% when the game update starts and stay there. With AQoSE, there is one short spike and then almost none." width="1440" height="624" loading="lazy">
+    <figcaption>One run of S7, second by second. When the game update starts, plain CAKE lets almost every game frame arrive late. AQoSE had already recognised the game and put it in a protected lane, so after one short blip the game stays smooth.</figcaption>
+  </figure>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Situation</th><th>What happens in it</th><th>Plain CAKE</th><th>AQoSE</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">S1</td><td>A big download starts during a video call (on another device)</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S2</td><td>The internet line suddenly drops to a fifth of its speed during a call</td><td class="n">56% late</td><td class="n">1.0% late</td><td class="win">AQoSE better*</td></tr>
+        <tr><td class="tag">S3</td><td>Three TVs streaming and a game console</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S4</td><td>A cloud backup fills the upload during a game (on another device)</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
+        <tr><td class="tag">S5</td><td>Work call on a laptop that is backing up, busy evening</td><td class="n">93% late</td><td class="n">0.2% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S6</td><td>HD video call on a laptop that is also sharing files</td><td class="n">94% late</td><td class="n">1.7% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S7</td><td>Cloud game on a PC that is downloading a game update</td><td class="n">83% late</td><td class="n">0.7% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S8</td><td>Traffic that changes: camera off and on, game lobby then match</td><td class="n">62% late</td><td class="n">0% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S10</td><td>Things break: the speed checks go silent, then AQoSE is killed</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="max-width: var(--measure)">* S2 is won by a different part of AQoSE, the line-speed checker, not by the traffic recogniser. Any tool that adapts to line speed should win it, which is why cake-autorate (B3) is in the final tests. If it matches us, we say "as good as the standard tool, built in".</p>
+  <p style="max-width: var(--measure)"><strong>Why the ties are good news.</strong> In S1, S3, S4 and S10 each call or game is alone on its device. CAKE's fairness already protects it there, so nobody can do better than CAKE, and AQoSE doesn't get in the way. Our measurements predicted this before those tests ran. So the claim is: <strong>AQoSE beats CAKE when a call or game shares its device with heavy traffic, and ties it otherwise.</strong></p>
+  <figure>
+    <img src="charts/total-cost.png" alt="Bar chart of flows left unusable over all nine situations, middle of ten repeats: no QoS 12.21, plain CAKE 5.54, threshold rules 6.61, our model with the simple choice 1.74, AQoSE 0.66." width="1280" height="576" loading="lazy">
+    <figcaption>All 9 situations added up: how many calls, games, streams or downloads ended up unusable. No QoS 12.2, plain CAKE 5.5, threshold rules 6.6, our model with the simple choice 1.7, AQoSE 0.7. The threshold rules do worse than plain CAKE because they push calls and games into the slow lane. Use this as a summary, not a headline: the exact ratio depends on which situations we chose.</figcaption>
+  </figure>
+  <p style="max-width: var(--measure)"><strong>The model on its own.</strong> On 43,221 samples of recorded traffic it was never trained on, the current model labels 97% correctly. On apps from a data source it never saw at all, it does much worse, which is our main known weakness (see below).</p>
+</section>
+
+<section>
+  <p class="kicker">How we got here</p>
+  <h2>What happened, day by day</h2>
+  <div class="timeline">
+    <div class="day"><p class="when">Sun Oct 11</p><ul>
+      <li>Recorded our own app traffic for training. The first three recordings were useless: the recording started after the app, so each connection's first packets were missing. Fixed the recorder.</li>
+      <li>Second try worked: three cloud-gaming sessions on JioGamesCloud, our only data from a real home line and a 2026 app.</li>
+    </ul></div>
+    <div class="day"><p class="when">Mon Oct 12</p><ul>
+      <li>Collected public datasets: university recordings of Zoom, Meet, Teams and Webex calls, cloud gaming, browsing, streaming and downloads. Learned that each lab's data has its own quirks, so we use several sources per traffic type.</li>
+      <li>Sealed dataset v1. Trained two kinds of model; picked LightGBM over a random forest (same accuracy, 10× faster, 8× smaller).</li>
+    </ul></div>
+    <div class="day"><p class="when">Tue Oct 13</p><ul>
+      <li>Finished the "watch" parts: re-checking, undoing bad changes, the line-speed checker and priority requests.</li>
+      <li>First full trial run. It found a real mistake: our harm table rated the Voice lane as costing nothing, so AQoSE sent too much there and lost one situation. Added a rule: Voice only for things likely to be calls or games.</li>
+      <li>Started the main experiment: 450 runs, about 27 hours.</li>
+    </ul></div>
+    <div class="day"><p class="when">Wed Oct 14</p><ul>
+      <li>Recorded six WhatsApp calls (3 voice, 3 video) on a home line.</li>
+      <li>Published an interim report at 6 of 10 repeats, and got an outside review. It asked for: fresh tests the system was never tuned on, a brand-new situation, a comparison with cake-autorate, and a safer rule for the slow lane.</li>
+      <li>While the experiment kept running, built all of that: the safer slow-lane rule (in our checks, no calls or games sent there by mistake any more), a fix to the line-speed checker, the model retrained with the WhatsApp calls, and the model rewritten in Go so it runs in 6 microseconds with no Python on the router.</li>
+    </ul></div>
+    <div class="day"><p class="when">Thu Oct 15</p><ul>
+      <li>Early morning: all 450 runs and the 90 noise checks finished, every one valid. Updated the interim report to all 10 repeats.</li>
+      <li>07:41: system frozen; final tests started on their own.</li>
+      <li>Made the one-slide summary for the design team.</li>
+      <li>A second review raised a sharp point: our fake calls are also in the model's training data, so the wins might partly be the model recognising its own lab traffic. Built a way to replay real recorded WhatsApp calls in the test network, packet for packet. Those tests run after the final tests.</li>
+    </ul></div>
+    <div class="day future"><p class="when">Fri Oct 16</p><ul>
+      <li>About 9 AM: final tests end. About noon: the real-call tests end.</li>
+      <li>Open the sealed test set once (real recordings nobody has looked at), for the most honest accuracy number.</li>
+      <li>Afternoon or evening: final report as a PDF, and the one-slide summary with final numbers and a QR code to the report.</li>
+    </ul></div>
+    <div class="day future"><p class="when">By Fri Oct 23</p><ul>
+      <li>Submission. The case study is written by the literature and design team from the final report.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Lessons</p>
+  <h2>What went wrong along the way, and what it taught us</h2>
+  <ul class="plain">
+    <li><strong>A wrong label is not always a wrong lane.</strong> Calling a video call a voice call does no harm: both are protected. What matters is where things end up, so we measure that.</li>
+    <li><strong>Our harm table was wrong three times,</strong> and each time a test situation caught it. That is why the situations exist.</li>
+    <li><strong>Tests we wrote ourselves shared our blind spots.</strong> The line-speed checker passed every simulated test and then failed four times on the real test network. All four are now permanent tests.</li>
+    <li><strong>"Public data" does not mean "good data".</strong> One famous dataset sent all its streaming through a proxy and all its downloads over SSH, so a model trained on it learns the lab, not the apps.</li>
+    <li><strong>When there's nothing to go on, do nothing.</strong> An early version slowed the line when its speed checks went quiet; that broke a call on a perfectly good line. Now it holds still.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">Writing about it</p>
+  <h2>What we can say, and what we must not</h2>
+  <div class="two">
+    <div class="say"><h3>Safe to say</h3><ul>
+      <li>"Beats plain CAKE when a call or game shares its device with heavy traffic; ties it otherwise."</li>
+      <li>"Never did worse than the threshold rules in any test."</li>
+      <li>"Recognises traffic from packet sizes and timing; never reads content."</li>
+      <li>"Falls back to plain CAKE within about two seconds if it fails."</li>
+      <li>"In emulation" or "in a test network", every time we quote a result.</li>
+    </ul></div>
+    <div class="dont"><h3>Do not say</h3><ul>
+      <li>"Beats CAKE", without the condition. Or "CAKE is bad": CAKE is our foundation.</li>
+      <li>"Deployed", "tested in real homes" or "ready for homes". It has not run on a real router yet.</li>
+      <li>"AI", "deep learning" or "neural network". It is decision trees.</li>
+      <li>"Seven (or eight) times better" as a headline.</li>
+      <li>That the WhatsApp calls were labelled correctly. The video calls were labelled as voice calls, though every one was still protected.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <p class="kicker">Weak spots</p>
+  <h2>What the results do not show yet</h2>
+  <ul class="plain">
+    <li><strong>Everything ran in emulation on one laptop.</strong> No real router, no real home, no Wi-Fi.</li>
+    <li><strong>Our fake calls don't lower their quality when squeezed,</strong> the way real apps do, so CAKE's failures look bigger than they would be in real life.</li>
+    <li><strong>The model is much weaker on apps from sources it never saw.</strong> The new safety rule keeps those out of the slow lane, but a call could still be left in the normal lane. The real-call replay tests on Friday check this directly.</li>
+    <li><strong>The system was partly tuned on the same situations it is tested on.</strong> The fresh repeats and the brand-new situation (S11) in the final tests are there to answer this.</li>
+    <li><strong>Some traffic types have little data:</strong> only 19 voice-call and 23 streaming connections in the check set.</li>
+  </ul>
+</section>
+
+<section>
+  <p class="kicker">Words you'll see</p>
+  <h2>A small glossary</h2>
+  <dl class="terms">
+    <dt>Packet</dt><dd>A small piece of data. Everything on the internet travels as packets.</dd>
+    <dt>Connection (flow)</dt><dd>One conversation between an app and a server, such as one video call or one download. Apps often open several.</dd>
+    <dt>QoS</dt><dd>Quality of Service: deciding which traffic goes first when the line is busy.</dd>
+    <dt>CAKE</dt><dd>The best free traffic manager for home routers, built into Linux. Fair to devices and connections, but it can't tell which connection is the call.</dd>
+    <dt>Tin (lane)</dt><dd>One of CAKE's four priority lanes: Voice, Video, Best Effort, Bulk.</dd>
+    <dt>Classifier (model)</dt><dd>The trained program that guesses what kind of traffic a connection is.</dd>
+    <dt>Late frames</dt><dd>Video or game frames that arrive too late to show. The main measure of a frozen or stuttering call.</dd>
+    <dt>Scenario</dt><dd>One home situation we test, such as "video call while the laptop shares files". S1 to S13.</dd>
+    <dt>Seed</dt><dd>A number that fixes all the random details of a test, so every router setup gets exactly the same traffic.</dd>
+    <dt>A/A runs</dt><dd>Running the exact same test twice to see how much results vary by chance.</dd>
+    <dt>Freeze</dt><dd>The point after which the system is not changed any more, so the final tests are fair.</dd>
+    <dt>Emulation, testbed</dt><dd>Our pretend home network inside one laptop. Real software, pretend devices and internet line.</dd>
+    <dt>Sealed test set</dt><dd>Real recordings kept aside and never looked at, opened once at the end for an honest score.</dd>
+    <dt>Damage, cost</dt><dd>Our score for how badly a connection suffered: 0 is fine, 1 is unusable.</dd>
+  </dl>
+</section>
+
+<section>
+  <p class="kicker">Where things live</p>
+  <h2>Links and files</h2>
+  <ul class="plain">
+    <li><a href="https://claude.ai/artifact/4g4ryLQojkehcSCS8DdoYX">The detailed results page</a> (all 10 repeats, every table and chart). Open to anyone with the link.</li>
+    <li>The handover page for the writing team and the one-slide summary: ask Shreyash to share them.</li>
+    <li>In the code repository: <span class="mono">Project Log.md</span> (the full story), <span class="mono">reports/core.md</span> (every number), <span class="mono">reports/case-study/charts/</span> (the charts).</li>
+  </ul>
+  <p class="note">Questions about a number or a claim: check the detailed results page first. If it isn't there, it isn't measured yet.</p>
+</section>
+
+</main>
