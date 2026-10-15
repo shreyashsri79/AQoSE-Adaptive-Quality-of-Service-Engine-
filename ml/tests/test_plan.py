@@ -177,3 +177,40 @@ def test_a_change_the_profile_does_not_have_is_refused():
         planning.build(changing("voice_call", [(10, "camera", "off")]), "x", 7)
     with pytest.raises(ValueError):
         planning.build(changing("video_call", [(10, "camera", "dim")]), "x", 7)
+
+
+def test_a_replayed_call_sends_what_was_recorded():
+    """A video_call with a trace replays a real capture: its first packets,
+    the ones the classifier sees, exactly as recorded, then the recording
+    looped to the entry's length. The seed changes the ports only."""
+    from aqos_ml import trace as traces
+    recorded = traces.load("whatsapp-video-005937")
+    plan = planning.build(scenario("video_call", 200, trace="whatsapp-video-005937"), "x", 3)
+    other = planning.build(scenario("video_call", 200, trace="whatsapp-video-005937"), "x", 4)
+    for direction in ("up", "down"):
+        s, side = plan.schedules[direction], recorded[direction]
+        n = 50
+        assert np.allclose(s.t_s[:n], side["t_s"][:n])
+        assert np.array_equal(s.size[:n], np.clip(side["size"][:n], HEADER_SIZE, planning.REPLAY_MAX_PAYLOAD))
+        assert s.t_s[-1] < 200 and s.t_s[-1] > 199
+        assert np.all(np.diff(s.t_s) >= 0)
+        video = s.stream == MAIN
+        frames = np.unique(s.frame[video])
+        assert np.array_equal(frames, np.arange(len(frames)))
+        assert np.all(s.index < s.count)
+        assert np.all(s.size[~video] < planning.AUDIO_BELOW) and np.all(s.size[video] >= planning.AUDIO_BELOW)
+        assert 15 < plan.params["fps_" + direction] < 35
+        assert np.array_equal(s.size, other.schedules[direction].size)
+    assert (plan.server_port, plan.client_port) != (other.server_port, other.client_port)
+
+
+def test_a_replayed_call_cannot_switch_its_camera():
+    doc = changing("video_call", [(10, "camera", "off")])
+    doc["traffic"][0]["params"] = {"trace": "whatsapp-video-005937"}
+    with pytest.raises(ValueError, match="replays a recorded call"):
+        planning.build(doc, "x", 7)
+
+
+def test_a_trace_is_named_not_pathed():
+    with pytest.raises(ValueError):
+        planning.build(scenario("video_call", 20, trace="../../etc/passwd"), "x", 7)

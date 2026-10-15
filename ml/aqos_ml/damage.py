@@ -151,7 +151,8 @@ def frame_rate(profile, params, direction):
     """Frames per second a flow carries in one direction, or None when the
     profile has no frames with a deadline there."""
     if profile == "video_call":
-        return params["fps"]
+        # A replayed call (params "trace") has its own rate each way.
+        return params.get("fps_" + direction, params.get("fps"))
     if profile == "gaming":
         return params["tick_hz"]
     if profile == "cloud_gaming":
