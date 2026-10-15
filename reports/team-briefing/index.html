@@ -154,49 +154,73 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
   <p class="kicker">Architecture</p>
   <h2>Two paths: the kernel moves packets, AQoSE only labels them</h2>
   <p class="w">The design rule everything follows: <strong>no AQoSE code sits on the per-packet path.</strong> The kernel forwards every packet and CAKE queues it. AQoSE writes one label per connection into the kernel's connection tracker, and CAKE reads that label for each packet. If AQoSE is slow, wrong or dead, packets still flow; the worst case is plain CAKE.</p>
+  <p class="w"><strong>Follow one connection from start to end.</strong> Solid arrows are the main path; dashed arrows are the ways out when something says no. Every way out ends in plain CAKE, never in something worse.</p>
   <div class="diagram">
 <pre class="mermaid">
-flowchart TB
-    LAN(["LAN devices"])
-    WAN(["Internet"])
-    subgraph KERNEL["Linux kernel: the only per-packet path"]
-        direction LR
-        CT["conntrack<br/>mark = the flow's tin"]
-        CAKE["CAKE diffserv4<br/>upload on wan0, download on an IFB"]
+flowchart TD
+    START(["START<br/>A device opens a new connection<br/>e.g. a video call starts"])
+    K1["1 · Kernel creates a conntrack entry, mark 0<br/>CAKE handles it as plain CAKE for now"]
+    K2["2 · Feature extractor gets packets 1 to 8<br/>headers only: sizes, gaps, ports"]
+    K3["3 · Classifier, 259 trees, about 6 µs<br/>odds for 7 classes, e.g. video call 97%"]
+    K4["4 · Decision engine<br/>lowest expected damage, then the guards<br/>picks a tin: Voice, Video, Best Effort or Bulk"]
+    K5{"5 · Safety shield<br/>within every limit?"}
+    K6["6 · Enforcer writes the mark<br/>and reads it back"]
+    K7["7 · CAKE queues every packet of the flow<br/>in its tin, upload and download"]
+    K8{"8 · Each second:<br/>still like its class?"}
+    END(["END<br/>Connection closes,<br/>conntrack removes the entry"])
+    PLAIN["Stays in plain CAKE<br/>nothing changed"]
+
+    START --> K1 --> K2 --> K3 --> K4 --> K5
+    K5 -->|"yes: accept"| K6 --> K7 --> K8
+    K8 -->|"yes"| K7
+    K8 -->|"no: it changed"| K3
+    K7 -->|"connection ends"| END
+    K3 -.->|"timeout, error, queue full"| PLAIN
+    K5 -.->|"no: reject"| PLAIN
+    K6 -.->|"read-back mismatch: undo"| PLAIN
+    PLAIN -.->|"connection ends"| END
+
+    classDef ends fill:#5242c4,stroke:#5242c4,color:#ffffff,font-weight:bold
+    classDef step fill:#ffffff,stroke:#5242c4,color:#171a2b
+    classDef check fill:#ebe8fb,stroke:#5242c4,color:#171a2b
+    classDef safe fill:#e2f3ea,stroke:#1d7a52,color:#171a2b
+    class START,END ends
+    class K1,K2,K3,K4,K6,K7 step
+    class K5,K8 check
+    class PLAIN safe
+</pre>
+  </div>
+  <p class="w"><strong>Running alongside, all the time.</strong> Three loops work next to the main path. Each one can only propose a change, and every proposal goes through the same safety shield.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+    subgraph EST["Capacity estimator · every 100 ms"]
+        E1(["Probe 3 reflectors"]) --> E2{"Delay above<br/>baseline?"}
+        E2 -->|"yes"| E3["Propose a lower<br/>CAKE rate"]
+        E2 -->|"no, and busy"| E4["Propose +10%<br/>at most every 10.5 s"]
     end
-    subgraph AQOSD["aqosd, the controller (Go)"]
-        direction TB
-        EXT["Feature extractor<br/>nflog, first 8 packets"]
-        REC["Reclassifier<br/>class envelopes, 1/s"]
-        CAP["Capacity estimator<br/>3 reflectors, 100 ms"]
-        INT["Intent leases<br/>HTTP API"]
-        VER["QoE verifier<br/>tin delay before/after"]
-        SHIELD{"Safety shield<br/>pure function"}
-        ENF["Enforcer<br/>snapshot, apply, read back"]
-        HB["Heartbeat<br/>every 250 ms"]
+    subgraph VER["QoE verifier · after a promotion"]
+        V1(["Flow moved into<br/>Voice or Video"]) --> V2{"Tin delay worse<br/>10 s later?"}
+        V2 -->|"yes"| V3["Propose undo"]
+        V2 -->|"no"| V4(["Keep it"])
     end
-    subgraph SVC["aqos-classify (Go), Unix socket"]
-        CLS["259 boosted trees<br/>7 class probabilities"]
-        DEC["Decision engine<br/>expected damage + guards"]
+    subgraph WD["Watchdog · separate program"]
+        W1(["Heartbeat file<br/>touched every 250 ms"]) --> W2{"Older than 2 s?"}
+        W2 -->|"yes: AQoSE stopped"| W3(["Remove all labels,<br/>plain CAKE at safe rates"])
+        W2 -->|"no"| W1
     end
-    WD["aqos-watchdog<br/>separate process"]
-    LAN --> CAKE --> WAN
-    CT -->|"mark read per packet"| CAKE
-    CAKE -.->|"headers of packets 1-8"| EXT
-    CT -.->|"byte/packet counters, 1/s"| REC
-    EXT -->|"feature record"| CLS
-    REC -->|"window record on breach"| CLS
-    CLS --> DEC
-    INT -->|"leased classes"| DEC
-    DEC -->|"label proposal"| SHIELD
-    CAP -->|"rate proposal"| SHIELD
-    VER -->|"rollback proposal"| SHIELD
-    SHIELD -->|"accept / clamp"| ENF
-    ENF -->|"set mark"| CT
-    ENF -->|"set shaper rate"| CAKE
-    CAKE -.->|"tin delay"| VER
-    HB -.->|"file age"| WD
-    WD ==>|"silent 2 s: plain CAKE"| CAKE
+    E3 --> SH{"Safety shield"}
+    E4 --> SH
+    V3 --> SH
+    SH --> ENF["Enforcer"]
+
+    classDef ends fill:#5242c4,stroke:#5242c4,color:#ffffff
+    classDef safe fill:#e2f3ea,stroke:#1d7a52,color:#171a2b
+    class E1,V1,W1 ends
+    class W3,V4 safe
+    style EST fill:#f6f7fa,stroke:#dcdfe8
+    style VER fill:#f6f7fa,stroke:#dcdfe8
+    style WD fill:#f6f7fa,stroke:#dcdfe8
 </pre>
   </div>
   <div class="table-wrap">
