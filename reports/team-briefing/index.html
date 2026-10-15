@@ -73,6 +73,13 @@ strong { font-weight: 700; }
 .steps li::before { content: counter(step); font: 700 1.6rem/1 var(--display); color: var(--accent); padding-top: 0.15rem; }
 .steps li > div { display: grid; gap: 0.25rem; min-width: 0; }
 
+.w { max-width: var(--measure); }
+h3.part { margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; padding: 1rem; background: var(--sheet); color: #171a2b; }
+pre.mermaid { margin: 0; text-align: center; }
+pre.topo { margin: 0; overflow-x: auto; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 4px; font: 400 0.82rem/1.55 var(--mono); background: var(--next-soft); color: var(--ink); }
+td.best { font-weight: 700; color: var(--done); }
+.example ul { margin: 0.2rem 0; }
 .example { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 1rem 1.15rem; display: grid; gap: 0.5rem; }
 
 .big-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr)); gap: 1.6rem 2rem; }
@@ -120,8 +127,8 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
 
 <header>
   <p class="kicker">For the AQoSE team · Thursday Oct 15, 2026 · internal, not the submission</p>
-  <h1>What AQoSE is, and what happened this week</h1>
-  <p class="lede">A plain-language walk-through of the project for everyone on the team: the problem, how our system works, how we tested it, what the tests show so far, and what is still running. No networking background needed.</p>
+  <h1>How AQoSE works, and what happened this week</h1>
+  <p class="lede">The architecture and the engineering behind AQoSE, part by part with the real settings, then how the evidence is produced, what it shows so far and what is still running. Written in plain language; every number is measured.</p>
   <p class="note">The numbers on this page are from the main experiment, which finished this morning. They are close to final but not final: the frozen system is being re-tested right now, and those results replace these on Friday.</p>
 </header>
 
@@ -138,49 +145,284 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
 </section>
 
 <section>
-  <p class="kicker">The problem</p>
-  <h2>Your video call freezes because your own laptop is busy</h2>
-  <p>Picture this: you are on a video call, and the same laptop is uploading photos to Google Drive, or downloading a big game update. The call starts to freeze and stutter, even though your internet plan is fast enough for both.</p>
-  <p>Home routers decide which data goes out first. The best free software for this is called <strong>CAKE</strong>. CAKE is fair: it splits the internet line evenly between devices, and then evenly between each device's connections. That works well most of the time. But when your laptop has twenty connections open for the upload and one for the call, the call gets one twentieth of the laptop's share. That is not enough for video.</p>
-  <p>CAKE does have four priority lanes, called <strong>tins</strong>: Voice (fastest), Video, Best Effort (normal) and Bulk (slowest). The trouble is that something has to tell CAKE which connection is the call. Existing tools guess with simple rules such as "lots of packets per second means it's a download". Video calls and cloud games also send lots of packets, so those rules push exactly the wrong things into the slow lane.</p>
+  <p class="kicker">The problem, in two lines</p>
+  <h2>CAKE is fair to devices and blind to apps</h2>
+  <p>CAKE shares the line per device, then per connection, so a call that shares its laptop with twenty bulk connections gets a twentieth of the laptop's share. CAKE's four tins (Voice, Video, Best Effort, Bulk) could fix that, but nothing tells CAKE which connection is the call, and threshold rules mistake calls and cloud games for downloads because all three send many packets.</p>
 </section>
 
-<section>
-  <p class="kicker">Our idea</p>
-  <h2>Recognise each connection, then pick its lane</h2>
-  <p>AQoSE (Adaptive QoS Engine) is an add-on for routers that already run CAKE. CAKE keeps doing all the actual traffic handling. AQoSE only does one thing: it tells CAKE which lane each connection belongs in. It does this for every new connection, in four steps.</p>
-  <ol class="steps">
-    <li><div><h3>Listen</h3><p>It looks at the first 8 packets of a new connection: how big each one is and how far apart they come. Only these outside details, never the content. Think of recognising a friend by their footsteps without seeing their face.</p></div></li>
-    <li><div><h3>Predict</h3><p>A small trained model (37 decision trees, made with a tool called LightGBM) turns those numbers into odds for seven kinds of traffic: voice call, game, video call, streaming, web browsing, download and background transfer.</p></div></li>
-    <li><div><h3>Decide</h3><p>It picks the lane that would do the least harm, given those odds. How bad each wrong choice is was measured in our tests, not guessed. Safety rules sit on top: nothing goes to the slow lane unless the model is over 80% sure, never on its first packets alone, and never a UDP connection, the kind calls and games use.</p></div></li>
-    <li><div><h3>Watch</h3><p>Every second it checks that each connection still behaves like what it was labelled. If it changes, it is checked again. If a change made delays worse, the change is undone.</p></div></li>
-  </ol>
-  <div class="example">
-    <p><strong>An example of "least harm".</strong> Say the model is 55% sure a connection is a backup and 45% sure it is a game. Putting it in the slow lane is a gamble: if it really is the game, the game becomes unplayable. So AQoSE keeps it in a protected lane. If it is the backup after all, the backup only runs a little slower. A small cost, instead of a ruined game.</p>
+<section class="wide">
+  <p class="kicker">Architecture</p>
+  <h2>Two paths: the kernel moves packets, AQoSE only labels them</h2>
+  <p class="w">The design rule everything follows: <strong>no AQoSE code sits on the per-packet path.</strong> The kernel forwards every packet and CAKE queues it. AQoSE writes one label per connection into the kernel's connection tracker, and CAKE reads that label for each packet. If AQoSE is slow, wrong or dead, packets still flow; the worst case is plain CAKE.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+    LAN(["LAN devices"])
+    WAN(["Internet"])
+    subgraph KERNEL["Linux kernel: the only per-packet path"]
+        direction LR
+        CT["conntrack<br/>mark = the flow's tin"]
+        CAKE["CAKE diffserv4<br/>upload on wan0, download on an IFB"]
+    end
+    subgraph AQOSD["aqosd, the controller (Go)"]
+        direction TB
+        EXT["Feature extractor<br/>nflog, first 8 packets"]
+        REC["Reclassifier<br/>class envelopes, 1/s"]
+        CAP["Capacity estimator<br/>3 reflectors, 100 ms"]
+        INT["Intent leases<br/>HTTP API"]
+        VER["QoE verifier<br/>tin delay before/after"]
+        SHIELD{"Safety shield<br/>pure function"}
+        ENF["Enforcer<br/>snapshot, apply, read back"]
+        HB["Heartbeat<br/>every 250 ms"]
+    end
+    subgraph SVC["aqos-classify (Go), Unix socket"]
+        CLS["259 boosted trees<br/>7 class probabilities"]
+        DEC["Decision engine<br/>expected damage + guards"]
+    end
+    WD["aqos-watchdog<br/>separate process"]
+    LAN --> CAKE --> WAN
+    CT -->|"mark read per packet"| CAKE
+    CAKE -.->|"headers of packets 1-8"| EXT
+    CT -.->|"byte/packet counters, 1/s"| REC
+    EXT -->|"feature record"| CLS
+    REC -->|"window record on breach"| CLS
+    CLS --> DEC
+    INT -->|"leased classes"| DEC
+    DEC -->|"label proposal"| SHIELD
+    CAP -->|"rate proposal"| SHIELD
+    VER -->|"rollback proposal"| SHIELD
+    SHIELD -->|"accept / clamp"| ENF
+    ENF -->|"set mark"| CT
+    ENF -->|"set shaper rate"| CAKE
+    CAKE -.->|"tin delay"| VER
+    HB -.->|"file age"| WD
+    WD ==>|"silent 2 s: plain CAKE"| CAKE
+</pre>
   </div>
-  <p><strong>The safety net.</strong> Every decision passes a fixed safety check before it is applied, and a separate "watchdog" program puts the router back to plain CAKE within about 2 seconds if AQoSE crashes. So the worst case is what people have today.</p>
-  <p class="note">An honest note from the reviews: most of the improvement comes from the model recognising the traffic at all (step 2). The "least harm" rule in step 3 adds a further gain and mainly acts as a safety refinement. In the write-up we lead with the recognising.</p>
-</section>
-
-<section>
-  <p class="kicker">How we tested it</p>
-  <h2>A whole fake home network inside one laptop</h2>
-  <p>We could not test on hundreds of real homes, so we built a <strong>testbed</strong>: a pretend home network that runs inside one laptop. It has pretend devices (a laptop, a PC, a TV, a phone), a router, an internet line that we can make fast or slow, and pretend servers on the internet side. Programs on the devices act like real apps (video calls, games, downloads, streaming) and record whether every single packet and video frame arrived in time. People call this <strong>emulation</strong>.</p>
-  <p>We wrote <strong>9 home situations</strong> (called scenarios, S1 to S10) and ran each one with <strong>5 different router setups</strong>, 10 times each with different random details (called <strong>seeds</strong>). The same seed gives exactly the same traffic for every setup, so the comparison is fair: same test, different router.</p>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Code</th><th>Router setup</th><th>Plain meaning</th></tr></thead>
+      <thead><tr><th>Process</th><th>Language</th><th>Where it runs</th><th>Job</th></tr></thead>
       <tbody>
-        <tr><td class="tag">B0</td><td>No QoS</td><td>What a cheap router does: one big queue, no management at all</td></tr>
-        <tr><td class="tag">B2</td><td>Plain CAKE</td><td>The best free option today. The one we have to beat</td></tr>
-        <tr><td class="tag">B3</td><td>CAKE + cake-autorate</td><td>A popular community add-on that adjusts CAKE when the line speed changes. Added in the final tests</td></tr>
-        <tr><td class="tag">B4</td><td>CAKE + threshold rules</td><td>How existing tools (qosify) sort traffic: simple rules about packet rates and sizes</td></tr>
-        <tr><td class="tag">O1</td><td>CAKE + our model, simple choice</td><td>Our model, but it just picks the lane of the most likely type of traffic</td></tr>
-        <tr><td class="tag">O2</td><td><strong>AQoSE, the full system</strong></td><td>Our model, the "least harm" rule, the watching and all the safety parts</td></tr>
+        <tr><td class="tag">aqosd</td><td>Go</td><td>router</td><td>The controller: extractor, flow table, reclassifier, capacity estimator, verifier, lease API, shield, enforcer, heartbeat</td></tr>
+        <tr><td class="tag">aqos-classify</td><td>Go</td><td>router</td><td>The model and the decision rule behind a Unix socket. Used in the final runs</td></tr>
+        <tr><td class="tag">aqos_ml.serve</td><td>Python</td><td>router</td><td>Same socket protocol; runs the threshold rules (B4) and was the model service before the Go port</td></tr>
+        <tr><td class="tag">aqos-watchdog</td><td>Go, standard library only</td><td>router</td><td>Watches the heartbeat; restores plain CAKE if the controller stops</td></tr>
+        <tr><td class="tag">aqos-testbed</td><td>Go</td><td>host</td><td>Builds the emulated home: network namespaces, links, rate limits, delay</td></tr>
+        <tr><td class="tag">aqos_ml.gen / .run</td><td>Python</td><td>host, devices, server</td><td>Traffic generators that measure every packet; the experiment runner</td></tr>
       </tbody>
     </table>
   </div>
-  <p>Each run lasts 200 seconds in real time, and there were 450 of them, about 27 hours of testing. We also ran 90 <strong>A/A runs</strong>: the same setup twice with the same seed, to see how much results wobble by chance. Answer: almost not at all. In 8 of the 9 situations, two identical runs gave exactly the same score.</p>
+</section>
+
+<section>
+  <p class="kicker">Life of one connection</p>
+  <h2>From first packet to protected lane, about 50 ms of traffic</h2>
+  <ol class="steps">
+    <li><div><h3>Packet 1 creates a conntrack entry with mark 0</h3><p>Mark 0 means unlabelled, and CAKE picks the tin from the packet's own DSCP: exactly plain CAKE. For a 30 fps call the first 8 packets take a few tens of milliseconds.</p></div></li>
+    <li><div><h3>Packets 1 to 8 are copied to the extractor, headers only</h3><p>One nftables rule does the filtering in the kernel: <span class="mono">ct packets &lt; 9 log group 5 snaplen 64</span>. The extractor never sees packet 9 or any payload. After packet 8 it emits an <em>initial</em> feature record.</p></div></li>
+    <li><div><h3>The controller asks the classify service</h3><p>One JSON line over a Unix socket, with a 50 ms deadline, a queue of at most 1,024 requests and a cap of 200 classifications per second. Any timeout, error or full queue leaves the flow unlabelled.</p></div></li>
+    <li><div><h3>The service returns probabilities and a proposal</h3><p>259 trees give seven class probabilities in about 6 µs (Go). The decision engine turns them into a tin, a DSCP and a plain-English reason, for example "Looks like a video call (100% confident); the Video tin has the lowest expected damage."</p></div></li>
+    <li><div><h3>The safety shield returns accept, clamp or reject</h3><p>A pure function of the proposal and the current state. A reject stops here and the flow stays as it is.</p></div></li>
+    <li><div><h3>The enforcer writes the mark and reads it back</h3><p>Over netlink, only the low 3 bits of the conntrack mark. A read-back mismatch restores the previous value. From the next packet on, CAKE puts the flow in its new tin, both directions.</p></div></li>
+    <li><div><h3>The flow is watched until conntrack destroys it</h3><p>Once a second its counters are compared with its class's normal range. A breach sends a <em>window</em> record back to step 3. A promotion into Voice or Video is checked by the verifier 10 s later and undone if tin delay got worse.</p></div></li>
+  </ol>
+</section>
+
+<section>
+  <p class="kicker">Component by component</p>
+  <h2>How each part works, with its real settings</h2>
+
+  <h3 class="part">Marking: how a label reaches CAKE</h3>
+  <p>The label is the low three bits of the connection's conntrack mark. CAKE's <span class="mono">fwmark 0x7</span> option maps a mark of n to tin n.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Mark</th><th>Tin</th><th>Classes that land there</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">0</td><td>chosen by DSCP (plain CAKE)</td><td>unlabelled flows</td></tr>
+        <tr><td class="tag">1</td><td>Bulk</td><td>background transfer (CS1)</td></tr>
+        <tr><td class="tag">2</td><td>Best Effort</td><td>web and other (CS0), large download (AF11)</td></tr>
+        <tr><td class="tag">3</td><td>Video</td><td>video call (AF41), streaming (AF31)</td></tr>
+        <tr><td class="tag">4</td><td>Voice</td><td>voice call (EF), game and cloud game (CS4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul class="plain">
+    <li><strong>Upload:</strong> a postrouting rule copies the label onto each packet (<span class="mono">meta mark set ct mark and 0x7</span>); CAKE on <span class="mono">wan0</span> reads it.</li>
+    <li><strong>Download:</strong> packets from the WAN are redirected to an IFB device, and the tc filter restores the label first (<span class="mono">action ctinfo cpmark 0x7</span>); a second CAKE on the IFB reads it.</li>
+    <li><strong>Why a mark and not DSCP rewriting:</strong> mark 0 falls through to CAKE's normal behaviour, so "unlabelled equals plain CAKE" holds by construction, and removing two rules switches the whole system off. That is what the watchdog does.</li>
+    <li>Verified in the testbed: marks 1 to 4 land in Bulk, Best Effort, Video and Voice in both directions, IPv4 and IPv6, with at most 3 stray packets per flow.</li>
+  </ul>
+
+  <h3 class="part">Feature extractor</h3>
+  <ul class="plain">
+    <li>Receives packets 1 to 8 of each flow over nflog, stamped by the kernel, so the gaps are kernel receive times, not when the program woke up. Queue threshold is one packet: no batching delay.</li>
+    <li>Flow table keyed on the 5-tuple. <span class="mono">flow_id</span> and <span class="mono">host_id</span> are keyed hashes (random key per boot); real addresses never leave the controller.</li>
+    <li>Once a second it dumps conntrack counters and keeps five one-second samples per flow for the nine window features.</li>
+    <li>The same Go package runs offline on a pcap (<span class="mono">aqos-extract</span>), so training data and live data come from one code path. Checked: 120 of 120 flows gave identical records live and offline.</li>
+  </ul>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>The 28 model inputs</th><th class="n">Count</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Sizes of packets 1 to 8</td><td class="n">8</td><td>IP length, signed by direction (up positive, down negative)</td></tr>
+        <tr><td>Gaps between them</td><td class="n">7</td><td>microseconds</td></tr>
+        <tr><td>IP version, protocol</td><td class="n">2</td><td>4 or 6; TCP or UDP</td></tr>
+        <tr><td>Port class, both ends</td><td class="n">2</td><td>system, registered or dynamic range; raw port numbers are never used</td></tr>
+        <tr><td>Window statistics</td><td class="n">9</td><td>packets/s and bytes/s each way, mean size each way, size spread, rate variation, burstiness. Missing (NaN) on an initial record</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="part">Classifier</h3>
+  <ul class="plain">
+    <li><strong>Model:</strong> LightGBM gradient-boosted trees, 37 boosting rounds × 7 classes = 259 trees, up to 127 leaves each, learning rate 0.05. Settings picked from 12 random draws; rounds set by early stopping.</li>
+    <li><strong>Calibration:</strong> temperature scaling on a separate calibration split (probabilities = softmax(1.125 × raw scores)). Sigmoid, isotonic and temperature were all tried; the one with the lowest class-balanced expected damage was kept, not the lowest calibration error, because calibration error is dominated by web traffic.</li>
+    <li><strong>Data (v2):</strong> 246,274 records from 7 sources: ISCX Tor/non-Tor and VPN-nonVPN, Purdue video calls (Zoom, Meet, Teams, Webex), UNSW cloud gaming, Labayen, our testbed generators and our own captures (JioGamesCloud, WhatsApp). Split by session, never by record: 156,049 train, 29,250 calibration, 43,221 validation, plus a sealed test set.</li>
+    <li><strong>Weights:</strong> each flow counts once however many records it has, and each class counts the same however many flows it has.</li>
+    <li><strong>Selection:</strong> LightGBM against a random forest (300 trees) on the same splits, judged by class-balanced expected damage through the real decision engine. They tied on quality; LightGBM is 10× faster and 8× smaller.</li>
+    <li><strong>Go port:</strong> the trees are exported as plain data (<span class="mono">trees.json</span>, 2 MB) and walked in Go, including LightGBM's missing-value rules. On 2,000 records the Go probabilities match Python's to 4×10⁻¹⁶ and every tin is the same; 300 of 300 socket answers identical. About 6 µs per flow, against about 2 ms in the Python service.</li>
+    <li><strong>Scores:</strong> accuracy 0.972 and macro-F1 0.80 on validation (v2). Leaving a whole source out of training is much harsher (see "Weak spots").</li>
+  </ul>
+
+  <h3 class="part">Decision engine</h3>
+  <p>For each tin, expected damage = Σ over the 7 classes of P(class) × damage[class][tin]. The tin with the lowest expected damage wins, subject to the rules below. The damage table was <em>measured</em>: each class forced into each tin beside a call, a stream, a download and a peer-to-peer transfer, under three conditions (alone on its device, crowded device, narrow uplink), two seeds each, 240 runs. A cell is the flow's own loss plus the harm it does to everything else in the home, rounded to half a point.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Damage table</th><th class="n">Voice</th><th class="n">Video</th><th class="n">Best Effort</th><th class="n">Bulk</th></tr></thead>
+      <tbody>
+        <tr><td>Voice call</td><td class="n best">0</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td>Game, cloud game</td><td class="n best">0</td><td class="n best">0</td><td class="n">2.5</td><td class="n">6</td></tr>
+        <tr><td>Video call</td><td class="n">1.5</td><td class="n best">0</td><td class="n">2</td><td class="n">2.5</td></tr>
+        <tr><td>Streaming</td><td class="n best">0</td><td class="n">1</td><td class="n">0.5</td><td class="n">1.5</td></tr>
+        <tr><td>Web and other</td><td class="n best">0</td><td class="n">3.5</td><td class="n best">0</td><td class="n">7</td></tr>
+        <tr><td>Large download</td><td class="n">0.5</td><td class="n">4.5</td><td class="n best">0</td><td class="n">7</td></tr>
+        <tr><td>Background transfer</td><td class="n">2</td><td class="n">2</td><td class="n">1.5</td><td class="n best">0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Read a row as "how bad is it to put this class in that tin". A download in Video costs 4.5 because it hurts the calls already there. The table rates Voice as free for most classes, because each was measured alone in Voice; hence the Voice bar below.</p>
+  <ul class="plain">
+    <li><strong>Voice bar:</strong> Voice is allowed only if P(voice call) + P(game) &gt; 0.5. Voice is a quarter of the link; without this the table would send everything there.</li>
+    <li><strong>Demotion bar:</strong> Bulk is allowed only if the summed probability of the classes whose best tin is Bulk is over 0.8. Otherwise Best Effort.</li>
+    <li><strong>Bulk guard</strong> (added for the freeze): never demote on an initial record (first 8 packets only), and never a UDP flow. Calls and games are UDP. On held-out sources this cut unseen calls, games and downloads sent to Bulk to 0% (from 16%, 2%, 10%).</li>
+    <li><strong>Ties:</strong> tins within 0.05 of the lowest are a tie. A tie goes to the tin RFC 4594 gives the most likely class (never Bulk), else Best Effort, Video, Voice, Bulk in that order. Promotion is cheap; demotion needs evidence.</li>
+    <li><strong>Leases:</strong> on a leased device, the damage of interactive classes in Best Effort or Bulk is multiplied by 5. Leases change the table, never the probabilities.</li>
+    <li><strong>Fallback:</strong> probabilities that are missing, out of range or not summing to 1 give Best Effort with <span class="mono">decision_rule: fallback</span>.</li>
+  </ul>
+  <div class="example">
+    <p><strong>Worked example, with the real table.</strong> A connection the model rates 45% game, 55% background backup.</p>
+    <ul class="plain">
+      <li>Voice: 0.45×0 + 0.55×2 = 1.10, but barred (P(call or game) = 0.45, not over 0.5)</li>
+      <li>Video: 0.45×0 + 0.55×2 = <strong>1.10, lowest allowed</strong></li>
+      <li>Best Effort: 0.45×2.5 + 0.55×1.5 = 1.95</li>
+      <li>Bulk: 0.45×6 + 0.55×0 = 2.70</li>
+    </ul>
+    <p>Expected damage puts it in Video. Top label would pick Bulk (the likeliest class is the backup), and the demotion bar would then hold it in Best Effort: still a gamble with the game.</p>
+  </div>
+
+  <h3 class="part">Safety shield</h3>
+  <p>A pure Go function: proposal + current state in, accept, clamp or reject out, with a reason and a code. No side effects, which is what makes it fuzzable.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Check</th><th>If it fails</th></tr></thead>
+      <tbody>
+        <tr><td>Valid against the JSON contract; DSCP matches the tin</td><td>reject</td></tr>
+        <tr><td>Flow known to the flow table; proposal not stale (the "from" tin or rate is still current)</td><td>reject</td></tr>
+        <tr><td>Flip cap: a third tin change within 60 s pins the flow to unlabelled for good</td><td>reject</td></tr>
+        <tr><td>At most 50 re-marks per second in total</td><td>reject</td></tr>
+        <tr><td>Shaper rate inside the configured minimum and maximum</td><td>clamp</td></tr>
+        <tr><td>Rate step: up at most +10%, down at most −50% per proposal</td><td>clamp</td></tr>
+        <tr><td>At least 10 s since the last increase in that direction (decreases are never rate-limited)</td><td>reject</td></tr>
+        <tr><td>A panic inside the shield</td><td>recovered, reject</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Fuzzed with Go's native fuzzer: 10.9 million proposals in 5 minutes, no violation. Six bugs planted on purpose, one per bound, were each found in under a second. The property is written twice, independently of the code it checks.</p>
+
+  <h3 class="part">Enforcer</h3>
+  <p>Every change is a transaction: snapshot, apply, read back, compare. A label is read back with a fresh conntrack query; a rate with <span class="mono">tc -j</span>. A mismatch restores the snapshot and is logged. A flow that ended in between is not an error. Every proposal, applied or not, is a line in the run's <span class="mono">actions.jsonl</span> with its verdict and reason.</p>
+
+  <h3 class="part">Reclassifier</h3>
+  <ul class="plain">
+    <li>Each class has an envelope: the 5th to 95th percentile of each of the nine window features over its training flows.</li>
+    <li>A second is "outside" when at least 2 of the 9 features are out of range. Two outside seconds in a row trigger a recheck for a flow in Voice or Video; three (checked every other second, about 6 s) for Best Effort or Bulk.</li>
+    <li>A trigger sends a window record through the normal classify, decide, shield path. Back-off after a trigger: 5 s, doubling to 40 s while the flow stays outside. A routine recheck happens anyway at a random moment 30 to 60 s after the last answer.</li>
+    <li>Honest finding: the envelopes are a tight box, and 38% of unchanged video-call flows would be sent back at least once. A false trigger costs one classification and changes nothing if the answer is the same; the back-off keeps that cheap.</li>
+  </ul>
+
+  <h3 class="part">QoE verifier</h3>
+  <ul class="plain">
+    <li>Watches promotions into Voice or Video, shaper rate increases and lease starts.</li>
+    <li>Uses only what a real router can see: CAKE's per-tin delay for Voice and Video (the worse of the two, both directions) and the capacity estimator's probe delay above baseline. Never the generators' ground truth.</li>
+    <li>Compares the 10 s before the change with two 5 s windows after. "Worse" means up by more than 5 ms <em>and</em> more than half, in both windows. Worse on either figure: the change is undone through the shield, and a demoted-back flow cannot be promoted again for 60 s.</li>
+  </ul>
+
+  <h3 class="part">Capacity estimator</h3>
+  <ul class="plain">
+    <li>Probes three UDP reflectors every 100 ms. Per reflector, a delay baseline that follows drops fast and rises slowly; the signal is delay above baseline (threshold 15 ms on most reflectors, 3 probes in a row). Unanswered probes are waited for up to 3 s, and the age of the oldest one counts as delay.</li>
+    <li><strong>Download:</strong> CAKE sits after the bottleneck, so it knows what got through; a cut goes to 90% of the rate actually achieved (read 5 times a second, most of the last 600 ms).</li>
+    <li><strong>Upload:</strong> CAKE sits before the bottleneck and can't see what got through, so a cut is a fixed quarter, at most once a second.</li>
+    <li><strong>Download first</strong> (the freeze fix): round-trip probes can't tell which direction is queueing, so when both are busy it cuts the download and waits 2 s before touching the upload. This fixed the one run where AQoSE lost to CAKE.</li>
+    <li>No second cut while delay is falling (the queue is draining). Raises: one 10% step at most every 10.5 s, never above the configured rate. Reflectors silent: hold everything.</li>
+    <li>Measured in S2: drop from 100 to 20 Mbit/s detected in 360 ms, shaper under the link 1.1 s later, call p95 latency back to 16 ms within 5 s.</li>
+  </ul>
+
+  <h3 class="part">Intent leases</h3>
+  <p>A small HTTP API inside the controller (<span class="mono">POST /leases</span>, <span class="mono">GET</span>, <span class="mono">DELETE</span>) and a one-page form: "prioritise this device for N minutes". At most two leases, two hours each, one per device. A lease covers the three interactive classes on that device and only shifts the decision engine's balance (×5), so it matters for flows the model is unsure about. Expiry runs on the monotonic clock and survives a restart. Known gap: it takes effect at the flow's next window record, up to 5 s, not the 1 s target.</p>
+
+  <h3 class="part">Watchdog</h3>
+  <p>A separate binary, Go standard library only, sharing no code with the controller. The controller touches a heartbeat file every 250 ms from the loop that applies labels, and only while the extractor loop is alive too. If the file is older than 2 s, the watchdog removes the marking rule and filter and replaces both CAKE instances with plain CAKE at fixed safe rates. Measured: 2.06 to 2.14 s after <span class="mono">kill -9</span> or <span class="mono">kill -STOP</span>; 2.02 to 2.03 s in every S10 run. Never before 1.9 s, so a short stall doesn't trip it.</p>
+</section>
+
+<section>
+  <p class="kicker">The test rig</p>
+  <h2>How the evidence is produced</h2>
+  <h3 class="part">Testbed</h3>
+  <p>Rootless: one user namespace holding a network namespace per device plus four fixed ones. No sudo for any experiment.</p>
+  <pre class="topo">host-laptop  ─┐
+host-desktop ─┼─ br-lan [router] wan0 ── [isp] ── [core] ── [server]
+host-tv      ─┘   CAKE, aqosd           rate      delay     generators,
+                                         500 ms    netem     reflectors
+                                         FIFO</pre>
+  <ul class="plain">
+    <li><strong>isp</strong> is the bottleneck: a token bucket with a 500 ms FIFO, the "bloated modem" every configuration sits behind. <strong>core</strong> adds delay. They are separate so a rate limiter and netem never share an interface.</li>
+    <li>Offloads (TSO, GSO, GRO) are off on every link, or the router would see merged packets far larger than any real link carries and first-packet sizes would be wrong.</li>
+    <li>Rate accuracy: 0.00% error up and down on S1's link, repeatable to 0.01%.</li>
+  </ul>
+  <h3 class="part">Traffic generators</h3>
+  <ul class="plain">
+    <li>Eleven profiles: voice call, video call, gaming, cloud gaming, adaptive video streaming, web browsing, bulk download, game update, backup upload, peer-to-peer, flow storm.</li>
+    <li>Every packet carries a sequence number, a send timestamp and its frame number. A frame is late if its last packet arrives after send time + deadline (100 ms for calls, 50 ms for games) or never.</li>
+    <li>A plan is a pure function of scenario, traffic entry and seed. Both ends compute it, so the same seed gives byte-identical traffic on every configuration, and nothing is signalled during a run.</li>
+    <li>New this week: a video call can replay a recorded trace (real sizes, timing and first packets of a WhatsApp call). Scenarios S12 and S13 use it.</li>
+  </ul>
+  <h3 class="part">Runs, scoring and statistics</h3>
+  <ul class="plain">
+    <li>Each run: 20 s warm-up + 180 s measured, about 3.45 minutes wall time. The runner locks the testbed, checks validity (all generators exited cleanly, the watchdog fired when it should) and writes a manifest with versions and the git commit.</li>
+    <li>Per-flow cost from 0 (fine) to 1 (unusable): calls and games from late frames, loss, p95 latency and jitter; streams from stalls and lost bitrate; downloads from throughput lost against the same download under plain CAKE. Thresholds live in a config file, and raw measurements are kept, so other judgements need no new runs.</li>
+    <li>Comparisons are paired by seed. Reported: median and 95% bootstrap interval, Wilcoxon signed-rank p-value, rank-biserial effect size, Holm correction for the comparisons not named in advance. A difference inside the A/A noise band counts as a tie.</li>
+  </ul>
+</section>
+
+<section class="wide">
+  <p class="kicker">At a glance</p>
+  <h2>The system in numbers</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>What</th><th class="n">Value</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Packets the controller sees per flow</td><td class="n">≤ 8, headers only</td><td>kernel rule, measured 1,082 for 180 flows</td></tr>
+        <tr><td>Time to classify one flow</td><td class="n">≈ 6 µs (Go) · ≈ 2 ms (Python)</td><td>benchmarks</td></tr>
+        <tr><td>Model size</td><td class="n">1.5 MB (2 MB as Go data)</td><td>models/lgbm-v2-b3f691d8</td></tr>
+        <tr><td>Request deadline · queue · cap</td><td class="n">50 ms · 1,024 · 200/s</td><td>controller settings</td></tr>
+        <tr><td>Line-speed drop detected</td><td class="n">360 ms</td><td>S2</td></tr>
+        <tr><td>Fallback to plain CAKE after a crash</td><td class="n">2.02–2.14 s</td><td>watchdog tests, S10</td></tr>
+        <tr><td>Shield fuzzing</td><td class="n">10.9 M proposals, 0 violations</td><td>make fuzz</td></tr>
+        <tr><td>Tests</td><td class="n">≈ 200 unit, 16 testbed, 2 fuzz targets</td><td>make check, testbed-check, fuzz</td></tr>
+        <tr><td>Runs so far</td><td class="n">450 + 90 A/A, all valid</td><td>results-core, results-aa</td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="wide">
@@ -315,7 +557,7 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
     <dt>QoS</dt><dd>Quality of Service: deciding which traffic goes first when the line is busy.</dd>
     <dt>CAKE</dt><dd>The best free traffic manager for home routers, built into Linux. Fair to devices and connections, but it can't tell which connection is the call.</dd>
     <dt>Tin (lane)</dt><dd>One of CAKE's four priority lanes: Voice, Video, Best Effort, Bulk.</dd>
-    <dt>Classifier (model)</dt><dd>The trained program that guesses what kind of traffic a connection is.</dd>
+    <dt>Classifier (model)</dt><dd>The trained program that guesses what kind of traffic a connection is: 259 gradient-boosted decision trees.</dd>
     <dt>Late frames</dt><dd>Video or game frames that arrive too late to show. The main measure of a frozen or stuttering call.</dd>
     <dt>Scenario</dt><dd>One home situation we test, such as "video call while the laptop shares files". S1 to S13.</dd>
     <dt>Seed</dt><dd>A number that fixes all the random details of a test, so every router setup gets exactly the same traffic.</dd>
@@ -323,6 +565,13 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
     <dt>Freeze</dt><dd>The point after which the system is not changed any more, so the final tests are fair.</dd>
     <dt>Emulation, testbed</dt><dd>Our pretend home network inside one laptop. Real software, pretend devices and internet line.</dd>
     <dt>Sealed test set</dt><dd>Real recordings kept aside and never looked at, opened once at the end for an honest score.</dd>
+    <dt>conntrack</dt><dd>The Linux kernel's table of open connections. Each entry has a 32-bit "mark"; AQoSE uses its low 3 bits as the label.</dd>
+    <dt>nflog, nftables</dt><dd>Linux firewall machinery. One rule copies the first 8 packet headers of each connection to the extractor.</dd>
+    <dt>DSCP</dt><dd>A 6-bit priority tag in the IP header (EF, AF41, CS1…). Plain CAKE uses it to pick a tin; AQoSE uses the mark instead.</dd>
+    <dt>IFB</dt><dd>A virtual interface that lets the router shape incoming (download) traffic with a second CAKE.</dd>
+    <dt>Calibration</dt><dd>Adjusting a model so that "80% sure" really is right about 80% of the time. Needed because the decision engine multiplies by the probabilities.</dd>
+    <dt>Expected damage</dt><dd>Σ P(class) × damage[class][tin]: the average harm of a choice, given the odds.</dd>
+    <dt>Envelope</dt><dd>A class's normal range for each window feature (5th to 95th percentile of its training flows).</dd>
     <dt>Damage, cost</dt><dd>Our score for how badly a connection suffered: 0 is fine, 1 is unusable.</dd>
   </dl>
 </section>

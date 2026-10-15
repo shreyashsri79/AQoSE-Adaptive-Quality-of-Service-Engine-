@@ -317,7 +317,7 @@ flowchart LR
     <table>
       <thead><tr><th></th><th class="n">Random forest</th><th class="n ours">LightGBM</th></tr></thead>
       <tbody>
-        <tr><td>Settings</td><td class="n">300 trees, depth up to 24</td><td class="n ours">37 trees, 127 leaves each</td></tr>
+        <tr><td>Settings</td><td class="n">300 trees, depth up to 24</td><td class="n ours">37 rounds × 7 classes = 259 trees, up to 127 leaves each</td></tr>
         <tr><td>How the settings were found</td><td class="n">fixed</td><td class="n ours">12 tried, best on validation</td></tr>
         <tr><td>Calibration (chosen by expected damage)</td><td class="n">isotonic</td><td class="n ours">sigmoid</td></tr>
         <tr><td>Balanced expected damage, expected-damage rule</td><td class="n">0.146</td><td class="n ours">0.141</td></tr>
