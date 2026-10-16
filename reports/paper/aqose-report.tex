@@ -20,7 +20,10 @@
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
+\usepackage{etoolbox}
 \usepackage{hyperref}
+% Every top-level topic starts on a new page.
+\pretocmd{\section}{\clearpage}{}{}
 
 \definecolor{aq}{HTML}{5242C4}
 \definecolor{aqsoft}{HTML}{EBE8FB}
@@ -97,8 +100,8 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 
 The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists what these results do not show.
 
+\clearpage
 \tableofcontents
-\newpage
 
 %======================================================================
 \section{The problem}
