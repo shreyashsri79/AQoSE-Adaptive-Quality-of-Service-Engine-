@@ -120,23 +120,6 @@ The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE 
 %======================================================================
 \section{Design}
 
-\subsection{The three ideas}
-Three ideas carry the design. Everything else in this section supports them.
-
-\begin{enumerate}[leftmargin=*,itemsep=5pt]
-\item \textbf{Classify once, and cheaply.} A connection is recognised from the headers of its first eight packets alone: their sizes, the gaps between them, ports and protocol. That is about 6\,\textmu s of work, once per connection, and it happens within the first fraction of a second, before a call or a game has had time to suffer.
-\item \textbf{Write one label per connection.} The whole connection, all of its packets, goes to one CAKE tin, written once as a conntrack label that CAKE reads for every packet; no AQoSE code sits on the per-packet path, and splitting a connection between tins would reorder its packets. The tin is picked by expected harm: the classifier's odds times the measured harm of putting each kind of traffic in each tin, lowest total wins. This is the frame that holds the guards (the Voice bar, the demotion bar, the bulk guard, leases). Offline it beats picking the top label; live, the classifier's accuracy carries the wins and expected harm adds nothing measurable (Section~\ref{sec:ablation}).
-\item \textbf{Re-check cheaply.} After the first decision, a check each second compares the connection's traffic, read from the kernel's counters, with the normal range of its class. No model runs. The classifier is asked again only when a connection stays outside its range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds. Over 80 runs, 165,684 per-second checks led to 5,453 classifications: 3.3\%.
-\end{enumerate}
-
-Figure~\ref{fig:ideas} follows two connections through the first two ideas, with harms from the measured damage table and illustrative odds.
-
-\begin{figure}[H]\centering
-\includegraphics[width=\linewidth]{diagrams/ideas.pdf}
-\caption{Two connections, decided. Red is most likely a video call: Video has the lowest expected harm, and all of red's packets go there. Blue is most likely a background backup: Bulk has the lowest expected harm, but on its first eight packets the guard keeps it in Best Effort; a few seconds later, more than 80\% sure and on TCP, all of blue goes to Bulk. Voice is barred for both, because neither is likely enough to be a call or a game.}
-\label{fig:ideas}
-\end{figure}
-
 \subsection{What happens, step by step}
 Figure~\ref{fig:activity} follows an ordinary evening: a video call starts on a laptop, and the same laptop then starts a cloud backup. The router recognises each connection from its first eight packets and puts the call in the Video tin and the backup in Bulk (or Best Effort when it is not sure). After that, a cheap check each second compares each connection's traffic with its class's normal range; the classifier is asked again only when a connection stays outside that range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds.
 
