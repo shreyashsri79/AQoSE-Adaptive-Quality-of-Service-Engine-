@@ -485,7 +485,8 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \item \textbf{Thin classes.} 6 voice-call, 8 streaming and 4 large-download flows in the sealed test set.
 \item \textbf{The cost scale is self-graded}: the same scale the damage table is built from. The raw measurements (late frames, latency) are the evidence.
 \item \textbf{Voice tin share.} A cloud game above a quarter of the line loses priority in Voice (one fresh seed of S7).
-\item \textbf{Not measured:} fairness between devices, a flood of short flows, IPv6 end to end, traffic inside a VPN, gigabit rates.
+\item \textbf{VPN traffic is out of scope.} A VPN carries all of a device's connections inside one encrypted tunnel, so no classifier on the router, AQoSE included, can tell a call from a backup inside it. We did not test VPN traffic. Tunnels over UDP, which most modern VPNs use, are never demoted and so get plain CAKE; tunnels over TCP must be excluded from demotion before any deployment.
+\item \textbf{Not measured:} fairness between devices, a flood of short flows, IPv6 end to end, gigabit rates.
 \item \textbf{Leases} take effect at the flow's next window, up to 5\,s, not the 1\,s target.
 \end{itemize}
 
@@ -498,7 +499,7 @@ Everything so far ran in emulation. These are the steps that would turn the prot
 \item \textbf{A field trial in homes.} Five to ten volunteer homes for four weeks, switching between AQoSE and plain CAKE on alternate days so each home is its own control. \emph{Measure}: router-side tin delay and probe delay, an opt-in note from users after calls (``did the call stutter?''), and the router's action log. \emph{Success}: fewer reported bad calls on AQoSE days, and no home worse off.
 \item \textbf{Fix the two known gaps.} Send interactive flows above a set share of the line to Video instead of Voice, and calm the reclassifier for flows the model is unsure about. \emph{Test}: rerun S7 with 20 to 30\,Mbit/s cloud games and the v1 real-call runs; then repeat the whole frozen protocol.
 \item \textbf{Broaden the data.} Captures from the team's and volunteers' homes across Indian ISPs and current apps, at least five sources for every class. \emph{Test}: leave-one-source-out damage below 0.5 for every source, and a new sealed test set opened once.
-\item \textbf{Stress and coverage.} A flood of short flows, many devices at once, IPv6 end to end, VPN traffic, gigabit lines, and fairness between devices (Jain's index). \emph{Success}: never worse than plain CAKE in any of them.
+\item \textbf{Stress and coverage.} A flood of short flows, many devices at once, IPv6 end to end, gigabit lines, and fairness between devices (Jain's index). \emph{Success}: never worse than plain CAKE in any of them.
 \item \textbf{Make it usable.} A page in the router's web interface (LuCI) to prioritise a device for an hour, and a readable log of why each connection was placed where it was.
 \end{enumerate}
 
