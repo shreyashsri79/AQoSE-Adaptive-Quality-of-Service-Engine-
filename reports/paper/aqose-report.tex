@@ -96,14 +96,14 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 \begin{itemize}[itemsep=1pt,topsep=4pt]
 \item \textbf{Against plain CAKE}, every seed-paired run of the frozen system: better in 49, tied in 41, worse in 0 on seeds 0--9, and 21, 29, 0 on fresh seeds never used in development.
 \item \textbf{Against cake-autorate}, the community tool for changing line speed, better in all 20 runs: 0.9\% late frames against its 4.6\% when the line slows (S2), and 0.1\% against 93.3\% on a call sharing its device with a backup (S5), which no rate setting can fix.
-\item \textbf{Real traffic.} Two real WhatsApp calls, replayed, were recognised within 0.13\,s in all 20 runs; late frames 57\% $\to$ 2.4\% (a call the model never trained on) and 79\% $\to$ 14\% (a larger one it trained on).
-\item \textbf{Sealed test set}, opened once: accuracy 0.969 and macro-F1 0.73 on 1,213 flows from 183 unseen sessions; no video call or cloud game sent to Bulk, partly by design, as UDP is never demoted (qosify's defaults: 14\% and 78\%).
+\item \textbf{Real traffic, replayed.} Two recorded WhatsApp calls, replayed in the emulator, were recognised within 0.13\,s in all 20 runs; late frames 57\% $\to$ 2.4\% (a call the model never trained on) and 79\% $\to$ 14\% (a larger one it trained on).
+\item \textbf{Sealed test set}, opened once: accuracy 0.969 but macro-F1 0.73 on 1,213 flows from 183 unseen sessions, with only 4--8 flows in some classes; no video call or cloud game sent to Bulk, partly by design, as UDP is never demoted (qosify's defaults: 14\% and 78\%).
 \item \textbf{Against the threshold rules} existing tools use, never worse in any run (52 better, 38 tied). Over the nine scenarios they leave 6.61 flows unusable, the classifier alone 0.70, the full system 0.69: the improvement comes from the classifier.
 \item \textbf{No starvation, fairness kept.} Bulk transfers keep a median 98\% of their plain-CAKE throughput (75--104\% by scenario) and never starve more than under plain CAKE; Jain's fairness index between devices is unchanged within $\pm0.01$.
 \item \textbf{Jitter, loss, link estimation.} A call's packet loss stayed at most 0.03\% where plain CAKE lost up to 91\%. After the line drops, the estimator is under the new rate within 2\,s, with 6\% steady-state error (cake-autorate: 20\%). IPv6 end to end (S14): late frames 94.3\% $\to$ 0.3\%.
 \end{itemize}
 
-The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
+The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{In emulation, AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} It has not yet run on a real router or in a real home. Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
 
 \clearpage\phantomsection
 \tableofcontents
@@ -306,7 +306,7 @@ Background transfer & 2 & 2 & 1.5 & 0 \\
 
 \paragraph{Watchdog} The controller touches a heartbeat file every 250\,ms. If the file is older than 2\,s, the watchdog removes the marking rules and replaces both CAKE instances with plain CAKE at fixed safe rates.
 
-\paragraph{Intent leases and overrides} A small HTTP API in the controller, with a one-page form, lets a person prioritise a device for up to two hours (at most two leases at once). A lease is the user's override of the classifier for that device: it multiplies the damage of leaving its calls and games in Best Effort or Bulk by five, so an uncertain flow on that device is promoted. An operator can also set a flow's tin directly with \texttt{aqos-ctl}. A lease takes effect at the flow's next window record, up to 5\,s later.
+\paragraph{Intent leases and overrides} A small HTTP API in the controller, with a one-page form, lets a person prioritise a device for up to two hours (at most two leases at once); in the prototype it has no authentication (Section~\ref{sec:product}). A lease is the user's override of the classifier for that device: it multiplies the damage of leaving its calls and games in Best Effort or Bulk by five, so an uncertain flow on that device is promoted. An operator can also set a flow's tin directly with \texttt{aqos-ctl}. A lease takes effect at the flow's next window record, up to 5\,s later.
 
 \subsection{Module contracts}
 Table~\ref{tab:contracts} gives each module's inputs, outputs, state, failure handling and the condition we tested it against. Figure~\ref{fig:states} shows the states one connection moves through.
@@ -409,7 +409,7 @@ Cloud-gaming flows sent to Bulk & 0\% & 0\% of 47 & 1\% & 78\% \\
 \section{How it was tested}
 
 \subsection{Testbed}
-One user namespace holds a network namespace per home device, a router, an ISP bottleneck (a token bucket with a 500\,ms FIFO, the ``bloated modem''), a delay element and the far-end servers. No root privileges are needed. Offloads are off on every link so the router sees real packet sizes. The bottleneck's rate error measured 0.00\%.
+One user namespace holds a network namespace per home device, a router, an ISP bottleneck (a token bucket with a 500\,ms FIFO, the ``bloated modem''), a delay element and the far-end servers. No root privileges are needed. Offloads are off on every link so the router sees real packet sizes. The bottleneck's rate error measured 0.00\%. Every experiment in this report ran in this emulation, on one laptop; AQoSE has not been run on a real router or deployed in a real home.
 
 \subsection{Traffic and measurement}
 Eleven generator profiles imitate calls, games, cloud games, adaptive video, browsing, downloads, game updates, backups and peer-to-peer. Every packet carries its sequence number, send time and frame number; a frame is late if its last packet arrives more than 100\,ms (calls) or 50\,ms (games) after it was sent, or never. A plan is a pure function of scenario, entry and seed, so every configuration sees byte-identical traffic for a given seed. A video call can also replay a recorded trace: the real sizes, timing and first packets of a captured call.
@@ -493,7 +493,7 @@ On seeds 10--14, run once, AQoSE was better than plain CAKE in 21 paired runs, t
 \paragraph{One failure} In one fresh seed of S7 the generator drew a 24.9\,Mbit/s cloud game. AQoSE placed it in Voice, as the taxonomy says, but \texttt{diffserv4} gives the Voice tin priority only up to a quarter of the shaped rate (23.75\,Mbit/s), so the game lost priority and 72\% of its frames were late, no better than plain CAKE. A high-bitrate interactive flow belongs in Video, which has half the rate; this is a design change for the next version.
 
 \subsection{Real calls, replayed}\label{sec:realcall}
-Because the testbed's generators are in the model's training data, the live wins might show the classifier recognising its own lab traffic. Two real WhatsApp video calls captured on a home line were therefore replayed packet for packet on a laptop sharing files.
+Because the testbed's generators are in the model's training data, the live wins might show the classifier recognising its own lab traffic. Two real WhatsApp video calls captured on a home line were therefore replayed packet for packet on an emulated laptop sharing files. Replay here means the testbed's generator re-sends the recorded packet sizes and timing inside the emulation; the WhatsApp app was not running, and the replayed call does not adapt its bitrate as the real app would. This is real traffic, not a live deployment.
 
 \begin{table}[H]\centering\small
 \begin{tabular}{@{}lrrrrr@{}}
@@ -600,7 +600,7 @@ Over the 125 frozen-system runs the policy stayed calm. A connection was labelle
 Marking had been verified on IPv6 in unit tests, but every scenario ran on IPv4. S14 is S6 with every connection over IPv6: the call, the file sharing and the download. It was written and run after the freeze, three seeds each with plain CAKE and AQoSE, all valid. The classifier recognised the call as a video call (97\% confident) at 0.01\,s, although IP version is one of its inputs and only 1\% of its training records were IPv6. This is not the model reacting to IP version: the same call over IPv4 in S6 was also labelled at 97\% in 9 of 10 seeds (82\% in the other), and setting only the IP version of all 43,221 validation records from 4 to 6 changed the top label of one record and the probabilities by $10^{-5}$ on average. (The 61--66\% in Section~\ref{sec:realcall} is a different call, a real WhatsApp recording.) The call's late frames fell from 94.3\% to 0.3\%, its p95 latency from 1,788\,ms to 19\,ms and its download packet loss from 90.9\% to 0\%. The bulk transfers kept 73--105\% of their plain-CAKE throughput, and Jain's index between the devices was 0.999 with plain CAKE and 0.996 with AQoSE.
 
 \subsection{Dashboard}
-Every run records the metrics a dashboard needs: per-packet latency, jitter and loss for each call and game, per-second throughput for every flow, and CAKE's delay, backlog and drops for every tin. Figure~\ref{fig:dash} is the run dashboard generated from one run of S5 (\texttt{python -m aqos\_ml.evidence}). The repository also holds a Grafana dashboard and a Prometheus exporter that tails a running experiment; they were generated and checked against the metric contract but not used for the results here.
+Every run records the metrics a dashboard needs: per-packet latency, jitter and loss for each call and game, per-second throughput for every flow, and CAKE's delay, backlog and drops for every tin. Figure~\ref{fig:dash} is the run dashboard generated from one run of S5 by \texttt{aqos\_ml.evidence} (command in the appendix). The repository also holds a Grafana dashboard and a Prometheus exporter that tails a running experiment; they were generated and checked against the metric contract but not used for the results here.
 
 \begin{figure}[H]\centering
 \includegraphics[width=\linewidth]{dashboard-S5.png}
@@ -625,8 +625,8 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \end{table}
 
 %======================================================================
-\section{From prototype to product}
-\paragraph{Security and privacy} AQoSE reads packet headers only, never payload, and never decrypts. Flow and device identifiers are keyed hashes; addresses never leave the controller, and the action log holds only hashed ids. Nothing in the system needs a credential, and the repository holds none (its full history was scanned before it was made public; API tokens and cookies are excluded by \texttt{.gitignore}). The lease API has no authentication in the prototype; it listens on the router's loopback address in the testbed. A product needs the router's own administrator login over HTTPS, rate limits on the API, and a signed model file: today the model's version and the hashes of its dataset and damage table are recorded, but the file is not signed. In the testbed everything runs without root in a user namespace; on a router the controller needs network-administration capability for tc, nftables and conntrack, and nothing more.
+\section{From prototype to product}\label{sec:product}
+\paragraph{Security and privacy} AQoSE reads packet headers only, never payload, and never decrypts. Flow and device identifiers are keyed hashes; addresses never leave the controller, and the action log holds only hashed ids. Nothing in the system needs a credential, and the repository holds none (its full history was scanned before it was made public; API tokens and cookies are excluded by \texttt{.gitignore}). The lease API has no authentication or access control in the prototype. It is off unless the controller is started with \texttt{-intent <address>}; in the testbed it listens only on the router's loopback address, 127.0.0.1. The code does not itself restrict the address to loopback, so in this form the API must not be reachable from a home network or any network beyond the controlled test environment. Before any such deployment it needs authentication and access control: the router's own administrator login over HTTPS, rate limits on the API, and a signed model file: today the model's version and the hashes of its dataset and damage table are recorded, but the file is not signed. In the testbed everything runs without root in a user namespace; on a router the controller needs network-administration capability for tc, nftables and conntrack, and nothing more.
 
 \paragraph{Performance} On the laptop the controller uses 3.6\% of one core and the classifier 0.04\%. A router's cores are several times slower, so we expect several times these figures; measuring them is the first next step. At high line rates on small routers, CAKE's own cost is likely to be the first limit, not AQoSE's.
 
@@ -680,7 +680,7 @@ Everything so far ran in emulation. These are the steps that would turn the prot
 \section{Conclusion}
 Home routers already have a very good queue manager in CAKE, and AQoSE does not try to replace it. It answers the one question CAKE cannot: which of the connections on a busy device is the call or the game. A small, calibrated tree model that reads only the headers of a connection's first eight packets is enough to answer it, in about six microseconds, and the answer is written once per connection as a label the kernel already knows how to use. No AQoSE code sits on the per-packet path.
 
-The evidence, all of it in emulation, is consistent. Where CAKE's fairness cannot help, a call or a game sharing its device with bulk traffic, late frames fell from 83--94\% to around 1\% across the main scenarios, on ten seeds and again on five fresh seeds the system had never seen. Real WhatsApp video calls, replayed packet for packet, were recognised within a fraction of a second and their late frames fell from 57\% to 2.4\% and from 79\% to 14\%. Where CAKE already works, AQoSE ties it, including on a home it was never tuned for. In 140 paired runs it was never worse than plain CAKE, never worse than the threshold rules existing tools use, and better than cake-autorate in all 20 runs where both were tested, 10 of them where the line's speed changed. On the sealed test set of real traffic it labelled 97\% of flows correctly and sent no call or cloud game to the slow lane, where qosify's defaults sent 78\% of cloud-gaming flows.
+The evidence, all of it in emulation, is consistent. Where CAKE's fairness cannot help, a call or a game sharing its device with bulk traffic, late frames fell from 83--94\% to around 1\% across the main scenarios, on ten seeds and again on five fresh seeds the system had never seen. Recordings of real WhatsApp video calls, replayed packet for packet inside the emulator, were recognised within a fraction of a second and their late frames fell from 57\% to 2.4\% and from 79\% to 14\%. Where CAKE already works, AQoSE ties it, including on a home it was never tuned for. In 140 paired runs it was never worse than plain CAKE, never worse than the threshold rules existing tools use, and better than cake-autorate in all 20 runs where both were tested, 10 of them where the line's speed changed. On the sealed test set of real traffic (1,213 flows from 183 unseen sessions) it labelled 96.9\% of flows correctly, but its macro-F1 is 0.73 and some classes have only 4 to 8 test flows, so accuracy alone overstates how well it generalises; it sent no call or cloud game to the slow lane, where qosify's defaults sent 78\% of cloud-gaming flows.
 
 The work also showed what does not carry the result. The expected-damage rule is a sound way to combine uncertain predictions with measured costs, but in live tests the classifier did the work: recognising the traffic at all is what fixes CAKE's blind spot. The model is much weaker on data sources it has never seen, CAKE's tin shares limit what any label can do for very large flows, and every result so far comes from one laptop.
 
@@ -690,21 +690,29 @@ The system is built to fail safe: every change passes a fuzz-tested shield, is r
 \appendix
 \section{Reproducing the results}
 \newpagenext
-The code, scenarios, traces, models and reports are public at \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. Raw run directories and datasets are not in the repository because of their size; every one can be regenerated with the commands below.
+{\sloppy The code, scenarios, the two replay traces, the trained models and the reports are public at \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. Raw run directories are not in the repository because of their size; the commands below regenerate them. The datasets are not in it either. The public sources are downloaded by \texttt{scripts/fetch-data.sh} (some sites serve only a registered browser session), but our own captures (three JioGamesCloud sessions and six WhatsApp calls) are not published, so dataset v2 and the sealed test set cannot be rebuilt exactly from the repository alone; the trained model built from them is in it. Commands run from the repository root; the Python package is not installed, so Python modules need \texttt{PYTHONPATH=ml}.\par}
 \begin{verbatim}
-make check                      # unit tests, Go and Python
-make testbed-check              # tests against the real testbed
-make fuzz                       # the safety shield, 5 minutes
-scripts/final-runs.sh           # every run after the freeze, then reports
-scripts/realcall-runs.sh MAIN WORKTREE  # replayed real calls
-python -m aqos_ml.compare \
-    --dataset data/dataset/v2.jsonl.gz --final   # sealed test, once
+make venv && make build && make check   # environment, binaries, unit tests
+make testbed-check                      # tests against the real testbed
+make fuzz                               # the safety shield, 5 minutes
+export PYTHONPATH=ml
+PY=.venv/bin/python
+$PY -m aqos_ml.run matrix configs/matrix-core.yaml --results results-core
+$PY -m aqos_ml.run matrix configs/matrix-aa.yaml --results results-aa
+scripts/final-runs.sh   # after the two above: every run after the freeze
+$PY -m aqos_ml.run matrix configs/matrix-realcall.yaml \
+    --results results-realcall                    # replayed real calls
+AQOS_MODEL=lgbm-v1-fe91bbad $PY -m aqos_ml.run matrix \
+    configs/matrix-realcall-v1.yaml --results results-realcall-v1
+$PY -m aqos_ml.run matrix configs/matrix-ipv6.yaml --results results-ipv6
+$PY -m aqos_ml.compare --dataset data/dataset/v2.jsonl.gz --final
+                                        # sealed test, once; needs the data
+$PY -m aqos_ml.evidence                 # fairness, loss, estimator, dashboard
 reports/paper/diagrams/render.sh        # the flowcharts in this report
 scripts/demo.sh                         # the scripted demo, about 8 minutes
-python -m aqos_ml.evidence              # fairness, loss, estimator, dashboard
 \end{verbatim}
 \subsection*{Scripted demo}
-\texttt{scripts/demo.sh} runs the whole loop in about eight minutes, without root: it resets the testbed and builds the binaries; introduces the condition by running S6 (a call, then file sharing on the same laptop at 30\,s) with plain CAKE and then with AQoSE on the same seed; collects the evidence each run writes (per-packet metrics, CAKE tin statistics, every decision with its reason, the verifier's verdicts, CPU per component); and reports a side-by-side table and a second-by-second chart. \texttt{python -m aqos\_ml.evidence} computes the fairness, jitter, loss, link-estimation and dashboard figures in this report from finished runs.
+\texttt{scripts/demo.sh} runs the whole loop in about eight minutes, without root: it resets the testbed and builds the binaries; introduces the condition by running S6 (a call, then file sharing on the same laptop at 30\,s) with plain CAKE and then with AQoSE on the same seed; collects the evidence each run writes (per-packet metrics, CAKE tin statistics, every decision with its reason, the verifier's verdicts, CPU per component); and reports a side-by-side table and a second-by-second chart. \texttt{aqos\_ml.evidence} computes the fairness, jitter, loss, link-estimation and dashboard figures in this report from finished runs.
 
 \subsection*{Prerequisites}
 \begin{table}[H]\centering\small
@@ -750,6 +758,6 @@ Mermaid & MIT & Rendering the flowcharts \\
 \end{tabularx}
 \end{table}
 
-Frozen system: git commit \texttt{4988d91}, model \texttt{lgbm-v2-b3f691d8}, dataset v2 (sha256 \texttt{b3f691d89f00}). Detailed tables, in \texttt{reports/}: \texttt{final.md}, \texttt{fresh.md}, \texttt{realcall.md}, \texttt{realcall-v1.md}, \texttt{ablation.md} and \texttt{head-to-head-v2-test.md}.
+Frozen system: git commit \texttt{4988d91}, model \texttt{lgbm-v2-b3f691d8}, dataset v2 (sha256 \texttt{b3f691d89f00}). Each run's manifest records the commit the repository was at when it ran, not always \texttt{4988d91}: commits made during the final runs changed only reports and documents, apart from the replay generator added for S12 and S13 and the S14 scenario file. Every manifest is also marked \texttt{+dirty}, meaning tracked files had uncommitted changes at run time; what those changes were was not recorded. Detailed tables, in \texttt{reports/}: \texttt{final.md}, \texttt{fresh.md}, \texttt{realcall.md}, \texttt{realcall-v1.md}, \texttt{ablation.md} and \texttt{head-to-head-v2-test.md}.
 
 \end{document}
