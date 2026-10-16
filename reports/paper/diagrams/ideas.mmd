@@ -1,0 +1,57 @@
+flowchart TB
+    subgraph I1["IDEA 1 · Classify once, cheaply"]
+        direction TB
+        R(["RED connection starts"]):::red
+        B(["BLUE connection starts"]):::blue
+        C["Classifier<br/>headers of the first 8 packets only<br/>259 small trees, about 6 µs, once per connection"]
+    end
+    subgraph I2["IDEA 2 · Decide by expected harm: odds × measured harm, lowest wins"]
+        direction TB
+        PR["RED odds<br/>video call 75%<br/>voice call 20%<br/>streaming 5%"]:::red
+        PB["BLUE odds<br/>background backup 55%<br/>cloud game 45%"]:::blue
+        ER["Expected harm per tin<br/>Voice 1.12, barred: not likely a call or game<br/><b>Video 0.05, lowest</b><br/>Best Effort 1.52<br/>Bulk 1.95<br/>top guess agrees: Video"]:::red
+        EB["Expected harm per tin<br/>Voice 1.10, barred: under 50% call or game<br/><b>Video 1.10, lowest</b><br/>Best Effort 1.95<br/>Bulk 2.70<br/>top guess disagrees: backup, so Bulk"]:::blue
+    end
+    subgraph CAKE["CAKE: four tins, each connection whole in one"]
+        direction LR
+        VO["VOICE<br/>priority up to 25%"]
+        VI["VIDEO<br/>priority up to 50%"]
+        BE["BEST EFFORT<br/>up to 100%"]
+        BU["BULK<br/>kept at least 6.25%"]
+    end
+    subgraph I3["IDEA 3 · Re-check cheaply"]
+        direction TB
+        K{{"Every second: is the connection still inside<br/>its class's normal range? Kernel counters, no model"}}
+        S["Stay in the tin<br/>96.7% of checks"]
+        A["Ask the classifier again<br/>3.3% of checks: out of range for 2–6 s,<br/>or a routine recheck every 30–60 s"]
+    end
+    R --> C
+    B --> C
+    C --> PR
+    C --> PB
+    PR --> ER
+    PB --> EB
+    ER ==>|"all of RED"| VI
+    EB ==>|"all of BLUE: if it is the game, it stays smooth;<br/>if it is the backup, it costs little"| VI
+    EB -.->|"plain top-label rule: Bulk, which would ruin the game"| BU
+    CAKE --> K
+    K -->|"yes"| S
+    K -->|"no"| A
+    classDef red fill:#fde8e6,stroke:#c0392b,color:#171a2b
+    classDef blue fill:#e3eefb,stroke:#2a78d6,color:#171a2b
+    style VO fill:#1d3557,stroke:#1d3557,color:#ffffff
+    style VI fill:#457b9d,stroke:#457b9d,color:#ffffff
+    style BE fill:#a8c5da,stroke:#457b9d,color:#171a2b
+    style BU fill:#dde8f0,stroke:#457b9d,color:#171a2b
+    style I1 fill:#f6f7fa,stroke:#5242c4
+    style I2 fill:#f6f7fa,stroke:#5242c4
+    style I3 fill:#f6f7fa,stroke:#5242c4
+    linkStyle 0 stroke:#c0392b,stroke-width:2px
+    linkStyle 2 stroke:#c0392b,stroke-width:2px
+    linkStyle 4 stroke:#c0392b,stroke-width:2px
+    linkStyle 6 stroke:#c0392b,stroke-width:4px
+    linkStyle 1 stroke:#2a78d6,stroke-width:2px
+    linkStyle 3 stroke:#2a78d6,stroke-width:2px
+    linkStyle 5 stroke:#2a78d6,stroke-width:2px
+    linkStyle 7 stroke:#2a78d6,stroke-width:4px
+    linkStyle 8 stroke:#8a8fa3,stroke-width:2px,stroke-dasharray:6 4

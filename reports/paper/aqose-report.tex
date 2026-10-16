@@ -77,7 +77,19 @@ Every number in this report was measured in emulation, on one laptop (Fedora 43,
 
 Home routers that run CAKE, the strongest open-source queue manager, already keep most calls and games smooth: CAKE shares the line fairly between devices and then between each device's connections. It fails in one common situation: \emph{a call or a game on a device that is also downloading, uploading or sharing files}. Fairness then gives the call a small slice of its own device's share, and nothing tells CAKE which connection is the call. Existing tools sort traffic with fixed thresholds (``many packets per second means bulk''), which mistake video calls and cloud games for downloads because they also send many packets.
 
-AQoSE is an add-on to CAKE. It watches the sizes and timing of the first eight packets of each new connection (headers only, never content), predicts the kind of traffic with a small gradient-boosted tree model, picks the CAKE priority tin with the lowest expected damage, and writes that choice as a connection label CAKE reads for every packet. A safety shield checks every change, a verifier undoes changes that raise delay, and a separate watchdog returns the router to plain CAKE within about two seconds if AQoSE stops.
+AQoSE is an add-on to CAKE built on three ideas (Figure~\ref{fig:ideas}):
+\begin{enumerate}[leftmargin=*,itemsep=3pt]
+\item \textbf{Classify once, cheaply.} From the sizes and timing of a new connection's first eight packets (headers only, never content), a small tree model gives the odds of seven kinds of traffic in about 6\,\textmu s.
+\item \textbf{Decide by expected harm, not by the top guess.} The odds are weighed against the measured harm of putting each kind of traffic in each of CAKE's four priority tins, and the whole connection goes to the tin with the lowest expected harm. A connection that is 55\% backup and 45\% game goes to Video, not Bulk: if it is the game, Bulk would ruin it; if it is the backup, Video costs little.
+\item \textbf{Re-check cheaply.} Each second a model-free check compares the connection with its class's normal range; the classifier runs again on only 3\% of those checks.
+\end{enumerate}
+The choice is written once as a connection label that CAKE reads for every packet. A safety shield checks every change, a verifier undoes changes that raise delay, and a separate watchdog returns the router to plain CAKE within about two seconds if AQoSE stops.
+
+\begin{figure}[!t]\centering
+\includegraphics[width=0.9\linewidth]{diagrams/ideas.pdf}
+\caption{The three ideas, with real numbers from the measured damage table. Red is a confident video call: the top guess and the lowest expected harm agree, and all of red goes to Video. Blue is uncertain: its top guess is a backup, and a plain top-label rule would send it to Bulk, where a game would be ruined; expected harm sends all of blue to Video. (Our own top-label baseline needs 80\% before Bulk and would leave blue in Best Effort, where a game still suffers.) The odds choose the tin; they never split a connection between tins, which would reorder its packets. Voice is barred for both, as neither is over 50\% likely a call or a game. Afterwards a per-second check without a model keeps each connection where it is unless its traffic leaves its class's normal range.}
+\label{fig:ideas}
+\end{figure}
 
 \begin{table}[H]\centering\small
 \begin{tabular}{@{}lrrrr@{}}
@@ -122,6 +134,17 @@ The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE 
 
 %======================================================================
 \section{Design}
+
+\subsection{The three ideas}
+Three ideas carry the design. Everything else in this section supports them.
+
+\begin{enumerate}[leftmargin=*,itemsep=5pt]
+\item \textbf{Classify once, and cheaply.} A connection is recognised from the headers of its first eight packets alone: their sizes, the gaps between them, ports and protocol. That is about 6\,\textmu s of work, once per connection, and it happens within the first fraction of a second, before a call or a game has had time to suffer.
+\item \textbf{Decide by expected harm, and send the whole connection to one tin.} The classifier gives odds, not a single answer. For each of CAKE's four tins the decision engine multiplies those odds by the measured harm of putting each kind of traffic there, and sends the connection, all of its packets, to the tin with the lowest total. The odds decide which tin; they never split a connection between tins, which would reorder its packets and hurt calls and downloads alike. When the model is unsure the total hedges: a connection that is 45\% game and 55\% backup goes to Video (expected harm 1.10), not Bulk (2.70), because if it is the game, Bulk would ruin it, and if it is the backup, Video costs it little.
+\item \textbf{Re-check cheaply.} After the first decision, a check each second compares the connection's traffic, read from the kernel's counters, with the normal range of its class. No model runs. The classifier is asked again only when a connection stays outside its range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds. Over 80 runs, 165,684 per-second checks led to 5,453 classifications: 3.3\%.
+\end{enumerate}
+
+Figure~\ref{fig:ideas}, in the Summary, follows two connections through all three ideas with the real numbers from the measured damage table.
 
 \subsection{What happens, step by step}
 Figure~\ref{fig:activity} follows an ordinary evening: a video call starts on a laptop, and the same laptop then starts a cloud backup. The router recognises each connection from its first eight packets and puts the call in the Video tin and the backup in Bulk (or Best Effort when it is not sure). After that, a cheap check each second compares each connection's traffic with its class's normal range; the classifier is asked again only when a connection stays outside that range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds.
