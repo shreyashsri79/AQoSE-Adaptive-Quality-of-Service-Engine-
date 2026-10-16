@@ -100,7 +100,7 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
   <p class="eyebrow">Teliport Season 4 · case study · final results of the frozen system</p>
   <h1>Adaptive QoS Engine</h1>
   <p class="lede">A home router that recognises a video call, a game or a download from packet sizes and timing alone, and puts each in the right priority queue of Linux CAKE. It beats plain CAKE when a call or a game shares its device with bulk traffic, ties it when they are alone on their devices, and never did worse than the hand-written threshold rules that existing tools use.</p>
-  <p class="meta">Measured Oct 13–16, 2026 · 1,026 runs (450 in development, 90 A/A, 486 after the freeze), all valid · reference laptop: Fedora 43, kernel 7.2.8, 16 cores</p>
+  <p class="meta">Measured Oct 13–16, 2026 · 1,032 runs (450 in development, 90 A/A, 492 after the freeze), all valid · reference laptop: Fedora 43, kernel 7.2.8, 16 cores</p>
 </header>
 
 <section class="wide" aria-label="Headline results">
@@ -280,6 +280,8 @@ flowchart LR
     <li><strong>S11, a family evening on a 50/10 line</strong>, written before the freeze and never run during development. Plain CAKE already protects everything (0.7% late frames) and AQoSE ties it (0.0%); the threshold rules ruin the call (69%). It shows AQoSE stays safe on a home it was not tuned for; it is not a new win.</li>
     <li><strong>cake-autorate</strong> (v3.2.2, unmodified). On S2 it cuts late frames from 56% to 4.6%; AQoSE reaches 0.9%, with p95 latency 19.5 ms against 95.9. On S5 it does nothing (93%): no rate setting fixes a call sharing its laptop with a backup.</li>
     <li><strong>Real WhatsApp video calls, replayed</strong> packet for packet on a laptop sharing files (50/4 line). S12, a call the frozen model never trained on: plain CAKE 57%, rules 43%, AQoSE 2.4% late frames. S13, a larger call that is in the training data: 79%, 97%, 14%. The model labelled both calls "video call" within 0.13 s in all 20 runs and kept them in Video. S13's remaining late frames are on the 4 Mbit/s upload, where the call's real keyframe bursts exceed the half of the link CAKE's Video tin may use at priority. With the model from before the freeze, which never saw WhatsApp, the calls were labelled "voice call" and still protected (6.6% and 31%), but the reclassifier moved them between Voice and Video several times.</li>
+    <li><strong>IPv6 end to end</strong> (S14: S6 with every connection over IPv6, three seeds). Late frames 94.3% → 0.3%, p95 latency 1,788 → 19 ms; the call was recognised as a video call at 0.01 s.</li>
+    <li><strong>No starvation, fairness kept.</strong> Bulk transfers keep a median 98% of their plain-CAKE throughput (75–104% by scenario; the ones that give way share a device with a call) and never starve more than under plain CAKE. Jain's index between devices is unchanged within ±0.01. After the line drops (S2), the estimator is under the new rate within 2 s with 6% steady-state error; cake-autorate 3 s and 20%.</li>
     <li><strong>One failure.</strong> In one fresh seed of S7 the generator drew a 24.9 Mbit/s cloud game. AQoSE put it in Voice, but CAKE gives Voice priority only up to a quarter of the rate (23.75 Mbit/s), so the game lost priority and 72% of its frames were late, no better than CAKE. High-bitrate interactive flows should go to Video; that is a change for the next version.</li>
   </ul>
 </section>
