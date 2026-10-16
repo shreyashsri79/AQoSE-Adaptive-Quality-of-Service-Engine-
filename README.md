@@ -1,6 +1,20 @@
-# Adaptive QoS Engine
+# AQoSE: Adaptive QoS Engine
 
-An intent-aware QoS controller on top of Linux CAKE. Entry for Tata Elxsi Teliport Season 4.
+A predictive traffic classifier for home routers that tells Linux CAKE which connection is the call or the game, from the sizes and timing of its first eight packets (headers only, never content). Entry for Tata Elxsi Teliport Season 4 by Shreyash Neeraj, Mridul Jaiswal and Sachi Jha.
+
+**Full report:** [reports/paper/aqose-report.pdf](reports/paper/aqose-report.pdf)
+
+Results, in emulation (median late video or game frames, frozen system):
+
+| Scenario | Plain CAKE | cake-autorate | Threshold rules | AQoSE |
+| --- | --- | --- | --- | --- |
+| HD call on a laptop that is sharing files (S6) | 94% | | 94% | **0.6%** |
+| Work call on a busy evening, backup running (S5) | 93% | 93% | 79% | **0.1%** |
+| Cloud game on a PC fetching an update (S7) | 83% | | 19% | **1.0%** |
+| Line drops to a fifth of its speed (S2) | 56% | 4.6% | 56% | **0.9%** |
+| Real WhatsApp video call, replayed (S12) | 57% | | 43% | **2.4%** |
+
+In 140 seed-paired runs AQoSE was never worse than plain CAKE (70 better, 70 tied) and never worse than threshold rules. Everything ran in a rootless network-namespace testbed on one laptop; it has not yet run on a real router. The report lists every limitation.
 
 - [Project log](<Project Log.md>): what was done, why, what was measured, what is next
 - [Product requirements](<Adaptive QoS Engine Product Requirements (Teliport S4).md>)

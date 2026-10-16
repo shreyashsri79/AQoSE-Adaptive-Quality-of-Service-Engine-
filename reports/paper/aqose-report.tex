@@ -23,7 +23,10 @@
 \usepackage{etoolbox}
 \usepackage{hyperref}
 % Every top-level topic starts on a new page.
-\pretocmd{\section}{\clearpage}{}{}
+\newif\ifnewpage\newpagetrue
+\pretocmd{\section}{\ifnewpage\clearpage\fi}{}{}
+\newcommand{\samepagenext}{\global\newpagefalse}
+\newcommand{\newpagenext}{\global\newpagetrue}
 
 \definecolor{aq}{HTML}{5242C4}
 \definecolor{aqsoft}{HTML}{EBE8FB}
@@ -61,15 +64,16 @@
 \vspace{0.6cm}{\color{aq}\rule{\linewidth}{1.2pt}}\par
 \vspace{1.2cm}
 {\large Full project report}\par\vspace{0.2cm}
-{\color{muted} Tata Elxsi Teliport, Season 4\\ Team: [team member names]\\ October 16, 2026}
+{\color{muted} Tata Elxsi Teliport, Season 4\\ Team: Shreyash Neeraj, Mridul Jaiswal, Sachi Jha\\ October 16, 2026}\par\vspace{0.5cm}
+{\small Source code, data pipeline, results and this report:\\ \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}}
 \vfill
 \begin{minipage}{\linewidth}\small\color{muted}
-Every number in this report was measured in emulation, on one laptop (Fedora 43, Linux 7.2.8, 12th-gen Intel Core i5, 16 threads), in a rootless network-namespace testbed. The system has not yet run on a real router or in a real home. Source, results and every script that produced them are in the project repository.
+Every number in this report was measured in emulation, on one laptop (Fedora 43, Linux 7.2.8, 12th-gen Intel Core i5, 16 threads), in a rootless network-namespace testbed. The system has not yet run on a real router or in a real home. Source, results and every script that produced them are in the public repository, \url{https://github.com/shreyashsri79/aqose}.
 \end{minipage}
 \end{titlepage}
 
+\clearpage\phantomsection\addcontentsline{toc}{section}{Summary}
 \section*{Summary}
-\addcontentsline{toc}{section}{Summary}
 
 Home routers that run CAKE, the strongest open-source queue manager, already keep most calls and games smooth: CAKE shares the line fairly between devices and then between each device's connections. It fails in one common situation: \emph{a call or a game on a device that is also downloading, uploading or sharing files}. Fairness then gives the call a small slice of its own device's share, and nothing tells CAKE which connection is the call. Existing tools sort traffic with fixed thresholds (``many packets per second means bulk''), which mistake video calls and cloud games for downloads because they also send many packets.
 
@@ -98,9 +102,9 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 \item \textbf{Cost}: the controller uses about 3.6\% of one laptop core; classifying one connection takes about 6\,\textmu s in Go.
 \end{itemize}
 
-The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists what these results do not show.
+The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists what these results do not show. Everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
 
-\clearpage
+\clearpage\phantomsection
 \tableofcontents
 
 %======================================================================
@@ -114,6 +118,22 @@ The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE 
 
 %======================================================================
 \section{Design}
+
+\subsection{What happens, step by step}
+Figure~\ref{fig:activity} follows an ordinary evening: a video call starts on a laptop, and the same laptop then starts a cloud backup. The router recognises each connection from its first eight packets, puts the call in the Video tin and the backup in Bulk (or Best Effort when it is not sure), and keeps checking every second.
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.78\linewidth]{diagrams/activity.pdf}
+\caption{Activity flow for one evening. Tins are CAKE's priority lanes; the numbers come from the replayed WhatsApp call (S12) and the HD-call scenario (S6).}
+\label{fig:activity}
+\end{figure}
+
+\subsection{System architecture}
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{diagrams/architecture.pdf}
+\caption{System architecture. Solid arrows carry decisions; dotted arrows carry measurements. Every proposal, from the classifier, the capacity estimator or the verifier, passes the safety shield before the enforcer touches the kernel.}
+\label{fig:arch}
+\end{figure}
 
 \subsection{Principle: no AQoSE code on the per-packet path}
 
@@ -228,9 +248,48 @@ Background transfer & 2 & 2 & 1.5 & 0 \\
 
 \paragraph{QoE verifier} Only what a router can see: CAKE's Voice and Video tin delay and the probe delay. Ten seconds before a promotion are compared with two 5\,s windows after; if delay rose by more than 5\,ms and more than half in both, the change is undone through the shield.
 
+\begin{figure}[H]\centering
+\includegraphics[width=0.66\linewidth]{diagrams/loop.pdf}
+\caption{The classify and reclassify loop. A flow is classified once from its first eight packets, then watched every second against its class's normal range. A flow that leaves the range for long enough, or whose routine recheck is due, is classified again from a window record; a promotion into Voice or Video is checked by the verifier ten seconds later.}
+\label{fig:loop}
+\end{figure}
+
 \paragraph{Capacity estimator} Three UDP reflectors probed every 100\,ms; delay above a slowly rising baseline signals a queue beyond the router. The download is cut to 90\% of what got through; the upload, whose delivered rate CAKE cannot see, by a fixed quarter. Because round-trip probes cannot tell which direction is queueing, it cuts the download first and touches the upload only if delay persists 2\,s later. Raises are one 10\% step every 10.5\,s at most; with the reflectors silent it changes nothing.
 
 \paragraph{Watchdog} The controller touches a heartbeat file every 250\,ms. If the file is older than 2\,s, the watchdog removes the marking rules and replaces both CAKE instances with plain CAKE at fixed safe rates.
+
+\subsection{The safety net}
+Every change, whoever proposes it, passes the same chain of checks (Figure~\ref{fig:safety}). Checks that fail reject the change, and nothing happens; bounds on the shaper rate clamp it instead. After the enforcer applies a change it reads it back and restores the previous state on any mismatch. Two things run beside the chain all the time: the watchdog, and the rule that a flow the classifier cannot answer for stays unlabelled. Both lead to plain CAKE, never to something worse.
+
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{diagrams/safety.pdf}
+\caption{The safety net. Orange boxes are the ways a change is refused or undone; green boxes are the fall-backs to plain CAKE.}
+\label{fig:safety}
+\end{figure}
+
+\subsection{How the line is shared between the four tins}
+AQoSE never sets a bandwidth itself. It only chooses a tin; CAKE's \texttt{diffserv4} mode then shares the shaped rate as in Figure~\ref{fig:tins} and Table~\ref{tab:tins}. A tin has priority only up to its threshold; traffic beyond the threshold still flows but without priority. Bulk keeps a minimum of one sixteenth of the line so a backup is never starved outright. Inside every tin, CAKE is fair first between devices and then between each device's connections.
+
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{diagrams/tins.pdf}
+\caption{How traffic is distributed on a 100\,Mbit/s line shaped to 95\,Mbit/s.}
+\label{fig:tins}
+\end{figure}
+
+\begin{table}[H]\centering\small
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+Tin & Mark & Share at priority & On a 95\,Mbit/s shaper & What AQoSE puts there \\
+\midrule
+Voice & 4 & up to 25\% & 23.75\,Mbit/s & voice calls, games, cloud games \\
+Video & 3 & up to 50\% & 47.5\,Mbit/s & video calls, streaming \\
+Best Effort & 2 or none & up to 100\% & 95\,Mbit/s & web, downloads, anything unsure \\
+Bulk & 1 & at least 6.25\% & 5.9\,Mbit/s & backups, peer-to-peer (TCP, over 80\% sure) \\
+\bottomrule
+\end{tabular}
+\caption{CAKE \texttt{diffserv4} thresholds. These shares explain two results: a 24.9\,Mbit/s cloud game outgrew Voice's 25\% (one fresh seed of S7), and a real call's keyframe bursts outgrew Video's 50\% of a 4\,Mbit/s upload (S13).}
+\label{tab:tins}
+\end{table}
 
 %======================================================================
 \section{Data and model}
@@ -415,7 +474,9 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \end{itemize}
 
 %======================================================================
+\samepagenext
 \section{Limitations}\label{sec:limits}
+\newpagenext
 \begin{itemize}
 \item \textbf{Emulation only.} One laptop, emulated links from 4 to 100\,Mbit/s; no real router, no real home, no Wi-Fi.
 \item \textbf{Generated and replayed calls do not adapt.} A real app lowers its bitrate when squeezed; ours lose frames. CAKE's failures are therefore larger here than they would be for real apps.
@@ -428,20 +489,33 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \item \textbf{Leases} take effect at the flow's next window, up to 5\,s, not the 1\,s target.
 \end{itemize}
 
-\section{Next steps}
-\begin{enumerate}
-\item Run on a real OpenWrt router and measure CPU and latency there.
-\item Send high-bitrate interactive flows to Video rather than Voice.
-\item Add sources per class, especially voice calls and streaming; retrain and check leave-one-source-out.
-\item A call generator driven by a real congestion controller, so ``CAKE breaks the call'' becomes ``the call falls to $x$\,kbit/s''.
-\item Calm the reclassifier for flows the model is unsure about (the v1 real-call runs).
+\section{Next steps: from emulation to real homes}
+Everything so far ran in emulation. These are the steps that would turn the prototype into something installed and tested in homes, each with how it would be tested and what would count as success.
+
+\begin{enumerate}[leftmargin=*,itemsep=6pt]
+\item \textbf{Run it on a real router.} Cross-compile \texttt{aqosd}, \texttt{aqos-classify} and the watchdog for an OpenWrt router (ARM), which already ships CAKE and nftables. \emph{Test}: the same scenarios through the router at 25, 100 and 300\,Mbit/s, measuring CPU, memory, classification latency and throughput. \emph{Success}: under 10\% of one router core at 100\,Mbit/s, no loss of throughput against plain CAKE, and the same wins as in emulation.
+\item \textbf{Test with real applications, live.} Real Zoom, Meet, WhatsApp and cloud-gaming sessions on laptops and phones over Wi-Fi, next to real backups and downloads, instead of generated or replayed traffic. \emph{Test}: read the apps' own quality statistics (WebRTC \texttt{getStats}: frame rate, freezes, bitrate), so the result includes the apps lowering their quality. \emph{Success}: fewer freezes and a higher sustained bitrate than plain CAKE, on the same evening's traffic.
+\item \textbf{A field trial in homes.} Five to ten volunteer homes for four weeks, switching between AQoSE and plain CAKE on alternate days so each home is its own control. \emph{Measure}: router-side tin delay and probe delay, an opt-in note from users after calls (``did the call stutter?''), and the router's action log. \emph{Success}: fewer reported bad calls on AQoSE days, and no home worse off.
+\item \textbf{Fix the two known gaps.} Send interactive flows above a set share of the line to Video instead of Voice, and calm the reclassifier for flows the model is unsure about. \emph{Test}: rerun S7 with 20 to 30\,Mbit/s cloud games and the v1 real-call runs; then repeat the whole frozen protocol.
+\item \textbf{Broaden the data.} Captures from the team's and volunteers' homes across Indian ISPs and current apps, at least five sources for every class. \emph{Test}: leave-one-source-out damage below 0.5 for every source, and a new sealed test set opened once.
+\item \textbf{Stress and coverage.} A flood of short flows, many devices at once, IPv6 end to end, VPN traffic, gigabit lines, and fairness between devices (Jain's index). \emph{Success}: never worse than plain CAKE in any of them.
+\item \textbf{Make it usable.} A page in the router's web interface (LuCI) to prioritise a device for an hour, and a readable log of why each connection was placed where it was.
 \end{enumerate}
 
 \section{Conclusion}
-A small, calibrated tree model that reads only the headers of a connection's first eight packets is enough to tell CAKE which connection is the call or the game. In emulation, that removes CAKE's one common failure, a call or a game sharing its device with bulk traffic, cuts late frames on real replayed WhatsApp calls from 57\% to 2.4\% and from 79\% to 14\%, ties CAKE everywhere else, and never did worse than the threshold rules existing tools use, at a few percent of one core and with a two-second fall-back to plain CAKE. The next test is a real router in a real home.
+Home routers already have a very good queue manager in CAKE, and AQoSE does not try to replace it. It answers the one question CAKE cannot: which of the connections on a busy device is the call or the game. A small, calibrated tree model that reads only the headers of a connection's first eight packets is enough to answer it, in about six microseconds, and the answer is written once per connection as a label the kernel already knows how to use. No AQoSE code sits on the per-packet path.
 
+The evidence, all of it in emulation, is consistent. Where CAKE's fairness cannot help, a call or a game sharing its device with bulk traffic, late frames fell from 83--94\% to around 1\% across the main scenarios, on ten seeds and again on five fresh seeds the system had never seen. Real WhatsApp video calls, replayed packet for packet, were recognised within a fraction of a second and their late frames fell from 57\% to 2.4\% and from 79\% to 14\%. Where CAKE already works, AQoSE ties it, including on a home it was never tuned for. In 140 paired runs it was never worse than plain CAKE, never worse than the threshold rules existing tools use, and better than cake-autorate in all 20 runs where both were tested. On the sealed test set of real traffic it labelled 97\% of flows correctly and sent no call or cloud game to the slow lane, where qosify's defaults sent 78\% of cloud-gaming flows.
+
+The work also showed what does not carry the result. The expected-damage rule is a sound way to combine uncertain predictions with measured costs, but in live tests the classifier did the work: recognising the traffic at all is what fixes CAKE's blind spot. The model is much weaker on data sources it has never seen, CAKE's tin shares limit what any label can do for very large flows, and every result so far comes from one laptop.
+
+The system is built to fail safe: every change passes a fuzz-tested shield, is read back, can be undone by a verifier that sees only what a router sees, and a separate watchdog returns the router to plain CAKE within about two seconds. That makes the next step low-risk: a real router in real homes, where the question is no longer whether the idea works in emulation but how much it helps people on their own calls.
+
+\samepagenext
 \appendix
 \section{Reproducing the results}
+\newpagenext
+The code, scenarios, traces, models and reports are public at \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. Raw run directories and datasets are not in the repository because of their size; every one can be regenerated with the commands below.
 \begin{verbatim}
 make check                      # unit tests, Go and Python
 make testbed-check              # tests against the real testbed
@@ -450,6 +524,7 @@ scripts/final-runs.sh           # every run after the freeze, then reports
 scripts/realcall-runs.sh MAIN WORKTREE  # replayed real calls
 python -m aqos_ml.compare \
     --dataset data/dataset/v2.jsonl.gz --final   # sealed test, once
+reports/paper/diagrams/render.sh        # the flowcharts in this report
 \end{verbatim}
 Frozen system: git commit \texttt{4988d91}, model \texttt{lgbm-v2-b3f691d8}, dataset v2 (sha256 \texttt{b3f691d89f00}). Detailed tables, in \texttt{reports/}: \texttt{final.md}, \texttt{fresh.md}, \texttt{realcall.md}, \texttt{realcall-v1.md}, \texttt{ablation.md} and \texttt{head-to-head-v2-test.md}.
 

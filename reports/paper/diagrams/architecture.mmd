@@ -1,0 +1,41 @@
+flowchart TB
+    LAN(["Home devices"])
+    WAN(["Internet"])
+    subgraph KERNEL["Linux kernel: the only per-packet path"]
+        direction LR
+        CT["conntrack<br/>mark = the flow's tin"]
+        CAKE["CAKE diffserv4<br/>upload on wan0, download on IFB"]
+    end
+    subgraph AQOSD["aqosd, the controller (Go)"]
+        direction TB
+        EXT["Feature extractor<br/>first 8 packets, nflog"]
+        REC["Reclassifier<br/>class envelopes, every 1 s"]
+        CAP["Capacity estimator<br/>3 reflectors, every 100 ms"]
+        INT["Intent leases<br/>HTTP API"]
+        VER["QoE verifier<br/>tin delay before and after"]
+        SH{"Safety shield"}
+        ENF["Enforcer<br/>snapshot, apply, read back"]
+        HB["Heartbeat<br/>every 250 ms"]
+    end
+    subgraph SVC["aqos-classify (Go), Unix socket"]
+        CLS["259 boosted trees<br/>7 class probabilities"]
+        DEC["Decision engine<br/>expected damage and guards"]
+    end
+    WD["aqos-watchdog<br/>separate process"]
+    LAN --> CAKE --> WAN
+    CT -->|"mark read for every packet"| CAKE
+    CAKE -.->|"headers of packets 1 to 8"| EXT
+    CT -.->|"counters, every second"| REC
+    EXT -->|"feature record"| CLS
+    REC -->|"window record on breach"| CLS
+    CLS --> DEC
+    INT -->|"leased classes"| DEC
+    DEC -->|"label proposal"| SH
+    CAP -->|"rate proposal"| SH
+    VER -->|"undo proposal"| SH
+    SH -->|"accept or clamp"| ENF
+    ENF -->|"set mark"| CT
+    ENF -->|"set shaper rate"| CAKE
+    CAKE -.->|"tin delay"| VER
+    HB -.->|"file age"| WD
+    WD ==>|"silent 2 s: plain CAKE"| CAKE
