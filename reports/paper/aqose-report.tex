@@ -460,7 +460,7 @@ S14 & S6 entirely over IPv6; written after the freeze \\
 \end{tabularx}
 \end{table}
 
-Configurations: \textbf{B0} no queue management; \textbf{B2} plain CAKE at 95\% of the line; \textbf{B3} CAKE with cake-autorate 3.2.2, unmodified; \textbf{B4} CAKE with qosify-style threshold rules; \textbf{O1} AQoSE choosing the tin of the likeliest class; \textbf{O2} AQoSE in full.
+Configurations: \textbf{B0} no queue management; \textbf{B2} plain CAKE at 95\% of the line; \textbf{B3} CAKE with cake-autorate 3.2.2, unmodified, default delay thresholds, our estimator's rate range and reflectors (\texttt{config.b3.sh} in each run); \textbf{B4} CAKE with qosify-style threshold rules; \textbf{O1} AQoSE choosing the tin of the likeliest class; \textbf{O2} AQoSE in full.
 
 \subsection{Protocol}
 Each run is 20\,s of warm-up and 180\,s measured. Comparisons are paired by seed. We report medians with 95\% bootstrap intervals, Wilcoxon signed-rank tests with rank-biserial effect sizes and Holm correction for comparisons not named in advance. Ninety A/A runs (the same configuration and seed twice) measured noise: identical summed cost in eight of nine scenarios, up to 0.14 in S8. A difference inside that band counts as a tie.
@@ -612,14 +612,14 @@ AQoSE estimator & within 1\,s (360\,ms in its log) & 2\,s & \ours{6\%} & \ours{2
 cake-autorate & within 1\,s & 3\,s & 20\% & 76\% \\
 \bottomrule
 \end{tabular}
-\caption{Medians of ten S2 runs, from per-second samples. Error is the mean absolute difference from the true rate from 10\,s after the drop.}
+\caption{Medians of ten S2 runs, from per-second samples. Error is the mean absolute difference from the true rate from 10\,s after the drop. cake-autorate ran with its default delay thresholds, base and maximum rate at 95\% of the line, minimum at a tenth, and the testbed's three reflectors pinged with \texttt{ping}, the same range and reflectors as our estimator; tuning those thresholds could narrow its error, which we did not try.}
 \end{table}
 
 \subsection{Policy stability and adaptation speed}
 Over the 125 frozen-system runs the policy stayed calm. A connection was labelled within about 0.13\,s of starting, after its eighth packet. Labelled flows changed tin 0.19 times each on average, about once a minute across a whole home; the flip cap pinned 2 flows in 80 runs; the verifier undid 1 change; and the classifier service never timed out, overflowed its queue or disagreed with a read-back. The capacity estimator changed the rate 5 times per run on average.
 
 \subsection{IPv6 end to end}
-Marking had been verified on IPv6 in unit tests, but every scenario ran on IPv4. S14 is S6 with every connection over IPv6: the call, the file sharing and the download. It was written and run after the freeze, three seeds each with plain CAKE and AQoSE, all valid. The classifier recognised the call as a video call (97\% confident) at 0.01\,s, although IP version is one of its inputs and little of its training data was IPv6. The call's late frames fell from 94.3\% to 0.3\%, its p95 latency from 1,788\,ms to 19\,ms and its download packet loss from 90.9\% to 0\%. The bulk transfers kept 73--105\% of their plain-CAKE throughput, and Jain's index between the devices was 0.999 with plain CAKE and 0.996 with AQoSE.
+Marking had been verified on IPv6 in unit tests, but every scenario ran on IPv4. S14 is S6 with every connection over IPv6: the call, the file sharing and the download. It was written and run after the freeze, three seeds each with plain CAKE and AQoSE, all valid. The classifier recognised the call as a video call (97\% confident) at 0.01\,s, although IP version is one of its inputs and only 1\% of its training records were IPv6. This is not the model reacting to IP version: the same call over IPv4 in S6 was also labelled at 97\% in 9 of 10 seeds (82\% in the other), and setting only the IP version of all 43,221 validation records from 4 to 6 changed the top label of one record and the probabilities by $10^{-5}$ on average. (The 61--66\% in Section~\ref{sec:realcall} is a different call, a real WhatsApp recording.) The call's late frames fell from 94.3\% to 0.3\%, its p95 latency from 1,788\,ms to 19\,ms and its download packet loss from 90.9\% to 0\%. The bulk transfers kept 73--105\% of their plain-CAKE throughput, and Jain's index between the devices was 0.999 with plain CAKE and 0.996 with AQoSE.
 
 \subsection{Dashboard}
 Every run records the metrics a dashboard needs: per-packet latency, jitter and loss for each call and game, per-second throughput for every flow, and CAKE's delay, backlog and drops for every tin. Figure~\ref{fig:dash} is the run dashboard generated from one run of S5 (\texttt{python -m aqos\_ml.evidence}). The repository also holds a Grafana dashboard and a Prometheus exporter that tails a running experiment; they were generated and checked against the metric contract but not used for the results here.
