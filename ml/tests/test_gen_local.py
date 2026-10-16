@@ -171,3 +171,31 @@ def test_a_client_without_a_server_fails(tmp_path):
     assert results["voice", "client"][0] != 0
     assert results["bulk", "client"][0] != 0
     assert "no packets received" in json.loads((tmp_path / "gen" / "voice.client.json").read_text())["error"]
+
+
+def test_a_replayed_call_runs_clean_on_loopback(tmp_path):
+    """The generators send a recorded call as recorded: nothing lost or late
+    with no bottleneck, at the recording's rate."""
+    from aqos_ml import trace as traces
+    doc = {"schema_version": 1, "id": "S98", "name": "replay on loopback", "duration_s": 12, "warmup_s": 0,
+           "link": {"down_kbit": 100000, "up_kbit": 100000, "delay_ms": 0}, "hosts": ["laptop"],
+           "traffic": [{"id": "call", "host": "laptop", "profile": "video_call", "start_s": 0, "stop_s": None,
+                        "params": {"trace": "whatsapp-video-010544"}}],
+           "events": [], "primary_metrics": ["frame_miss"]}
+    assert [e.message for e in SCENARIO_SCHEMA.iter_errors(doc)] == []
+    path = tmp_path / "S98.yaml"
+    path.write_text(yaml.safe_dump(doc))
+    out = tmp_path / "run"
+    results = harness.wait(harness.start(path, doc, 7, out), doc["duration_s"] + 15)
+    assert {k: e[-400:] for k, (code, e) in results.items() if code != 0} == {}
+    by = defaultdict(list)
+    for s in read_jsonl(out / "metrics.jsonl"):
+        by[s["metric"], s.get("direction")].append(s["value"])
+    recorded = traces.load("whatsapp-video-010544")
+    for direction in ("up", "down"):
+        assert max(by["loss_ratio", direction]) == 0
+        assert sum(by["frame_miss", direction]) == 0
+        # The call's own first 12 s: a call starts slower than it goes on.
+        sent = sum(size for t, size in zip(recorded[direction]["t_s"], recorded[direction]["size"]) if t < 12)
+        got = sum(by["throughput_kbit", direction])  # one sample a second
+        assert got == pytest.approx(sent * 8 / 1000, rel=0.25)

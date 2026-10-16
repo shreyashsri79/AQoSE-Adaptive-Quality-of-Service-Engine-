@@ -159,6 +159,52 @@ def _merge(*streams):
     return Schedule(*(c[order] for c in cols))
 
 
+# A replayed call (aqos_ml.trace). Repeats of the trace skip its first
+# seconds, since a call sets up once. Payloads under AUDIO_BELOW are audio,
+# keep-alives and control, judged by no deadline; video packets closer
+# together than FRAME_GAP_S were sent as one frame.
+REPLAY_LOOP_FROM_S = 5.0
+AUDIO_BELOW = 200
+FRAME_GAP_S = 0.003
+# Replayed packets keep their recorded size up to what one IPv6 packet on a
+# 1500-byte link carries.
+REPLAY_MAX_PAYLOAD = 1452
+
+
+def _replay_stream(side, trace_s, duration_s):
+    """One direction of a recorded call, looped to the entry's length, as
+    (t, size, stream, frame, index, count) like the other streams."""
+    t0, size0 = np.asarray(side["t_s"], np.float64), np.asarray(side["size"], np.int64)
+    body = t0 >= REPLAY_LOOP_FROM_S
+    ts, sizes, offset = [t0], [size0], trace_s
+    while offset < duration_s and body.any():
+        ts.append(t0[body] - REPLAY_LOOP_FROM_S + offset)
+        sizes.append(size0[body])
+        offset += trace_s - REPLAY_LOOP_FROM_S
+    t, size = np.concatenate(ts), np.concatenate(sizes)
+    keep = t < duration_s
+    t, size = t[keep], np.clip(size[keep], HEADER_SIZE, REPLAY_MAX_PAYLOAD).astype(np.int32)
+    stream = np.where(size < AUDIO_BELOW, AUDIO, MAIN).astype(np.int8)
+    frame = np.zeros(len(t), np.int64)
+    index = np.zeros(len(t), np.int32)
+    count = np.ones(len(t), np.int32)
+    audio = stream == AUDIO
+    frame[audio] = np.arange(audio.sum())
+    main = np.flatnonzero(~audio)
+    if len(main):
+        starts = np.concatenate([[True], np.diff(t[main]) > FRAME_GAP_S])
+        ids = np.cumsum(starts) - 1
+        first = np.flatnonzero(starts)
+        counts = np.diff(np.append(first, len(main)))
+        frame[main] = ids
+        index[main] = np.arange(len(main)) - first[ids]
+        count[main] = counts[ids]
+        frames = int(ids[-1]) + 1
+    else:
+        frames = 0
+    return (t, size, stream, frame, index, count), frames / duration_s
+
+
 # What a scenario's traffic_param events may change, per profile: the
 # parameter, its two values (normal first), and the value an entry starts
 # with unless its params say otherwise.
@@ -257,6 +303,16 @@ def _udp_plan(profile, rng, p, duration_s):
             d: _merge(_packet_stream(rng, duration_s, rate, params["payload_" + d], 0.05, MAIN))
             for d in ("up", "down")
         }
+
+    if profile == "video_call" and "trace" in p:
+        from .. import trace as traces
+        recorded = traces.load(p["trace"])
+        params, schedules = {"trace": p["trace"], "deadline_ms": float(p.get("deadline_ms", 100))}, {}
+        for d in ("up", "down"):
+            columns, fps = _replay_stream(recorded[d], recorded["duration_s"], duration_s)
+            schedules[d] = _merge(columns)
+            params["fps_" + d] = round(fps, 3)
+        return params, schedules
 
     if profile == "video_call":
         params = {
@@ -398,6 +454,8 @@ def build(scenario, traffic_id, seed):
     schedules, script = {}, {}
     if profile in UDP_PROFILES:
         params, schedules = _udp_plan(profile, rng, overrides, duration_s)
+        if spans and "trace" in params:
+            raise ValueError(f"traffic entry {traffic_id!r} replays a recorded call; its camera cannot be switched")
         schedules = _apply_changes(profile, params, schedules, spans)
     else:
         params, script = _tcp_plan(profile, rng, overrides, duration_s)
