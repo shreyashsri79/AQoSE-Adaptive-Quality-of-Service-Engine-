@@ -37,16 +37,13 @@
 </div>
 </div>
 <p style="position:absolute;left:1496px;top:142px;width:388px;font-size:14px;line-height:1.3;color:#4a5568"><b style="color:#14213d">Runs locally, no cloud.</b> Falls back to plain CAKE in 2 s if it stops. Tested in emulation.</p>
-<div style="position:absolute;left:1496px;top:16px;width:136px;display:flex;flex-direction:column;gap:4px">
+<div style="position:absolute;left:1484px;top:16px;width:152px;display:flex;flex-direction:column;gap:4px">
 <p style="font-size:13px;font-weight:700;letter-spacing:1px;line-height:1.2;color:#6250d6">FULL REPORT</p>
-<p style="font-size:14px;line-height:1.3;color:#4a5568">Scan the code, or open the link:</p>
-<p style="font-size:15px;font-weight:700;line-height:1.3;color:#14213d"><u>[report link]</u></p>
-<p style="font-size:13px;line-height:1.3;color:#4a5568">method, charts, raw results</p>
+<p style="font-size:14px;line-height:1.3;color:#4a5568">Scan the code, or open:</p>
+<p style="font-family:'Courier New', monospace;font-size:11px;font-weight:700;line-height:1.35;color:#14213d">claude.ai/artifact/<br>4g4ryLQojkehcSCS8DdoYX</p>
+<p style="font-size:13px;line-height:1.3;color:#4a5568">method, every chart, raw results</p>
 </div>
-<div style="position:absolute;left:1640px;top:14px;width:120px;height:120px;background:#ffffff;border:2px dashed #6250d6;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
-<p style="font-size:18px;font-weight:700;line-height:1.1;color:#6250d6;text-align:center">QR</p>
-<p style="font-size:12px;line-height:1.2;color:#4a5568;text-align:center">full project<br>report</p>
-</div>
+<img src="/_blob/50a183b4b2067723859461848d642bc6" alt="QR code linking to the full AQoSE results page" style="position:absolute;left:1644px;top:14px;width:120px;height:120px;object-fit:contain">
 <div style="position:absolute;left:36px;top:198px;width:1848px;height:2px;background:#14213d"></div>
 <div style="position:absolute;left:607px;top:212px;width:1px;height:818px;background:#d9dce3"></div>
 <div style="position:absolute;left:1291px;top:212px;width:1px;height:818px;background:#d9dce3"></div>
@@ -91,8 +88,8 @@
 <p style="font-size:16px;line-height:1.35;color:#4a5568">of a cloud game's frames arrive late with plain CAKE while its PC downloads an update (S7)</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:56px;font-weight:700;line-height:1;color:#14213d">89%</p>
-<p style="font-size:16px;line-height:1.35;color:#4a5568">of cloud-gaming flows sent to the lowest queue by qosify's default threshold rules</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:56px;font-weight:700;line-height:1;color:#14213d">78%</p>
+<p style="font-size:16px;line-height:1.35;color:#4a5568">of cloud-gaming flows in our sealed test set sent to the lowest queue by qosify's default rules</p>
 </div>
 </div>
 
@@ -300,10 +297,10 @@
 
 <p style="position:absolute;left:632px;top:632px;width:636px;font-size:16px;font-weight:700;letter-spacing:2px;color:#6250d6">05 · RESULTS, IN EMULATION</p>
 <h3 style="position:absolute;left:632px;top:656px;width:636px;font-family:'Space Grotesk', Arial, sans-serif;font-size:27px;font-weight:700;line-height:1.15;color:#14213d">Where CAKE fails, AQoSE fixes it</h3>
-<svg style="position:absolute;left:632px;top:700px;width:636px;height:332px" width="636" height="332" viewBox="0 0 636 332" xmlns="http://www.w3.org/2000/svg" aria-label="Late frames, plain CAKE, threshold rules and AQoSE. HD call on a laptop sharing files (S6): 94%, 94%, 1.7%; p95 delay 1.8 s to 17 ms. Cloud game while its PC updates (S7): 83%, 19%, 0.6%; delay 925 to 18 ms. Work call on a busy evening (S5): 93%, 74%, 0.1%; delay 36 to 27 ms. Line drops to a fifth (S2): 56%, 56%, 0.9%; delay 503 to 20 ms. Against plain CAKE over 54 seed-paired runs: 29 better, 24 tied, 1 worse. Never worse than threshold rules. Over all 9 scenarios, unusable flows 5.58 on CAKE, 0.73 on AQoSE.">
+<svg style="position:absolute;left:632px;top:700px;width:636px;height:332px" width="636" height="332" viewBox="0 0 636 332" xmlns="http://www.w3.org/2000/svg" aria-label="Late frames, median of 10 seeds, plain CAKE, threshold rules and AQoSE. HD call on a laptop sharing files (S6): 94%, 94%, 0.6%; p95 delay 1.8 s to 18 ms. Cloud game while its PC updates (S7): 83%, 19%, 1.0%; delay 799 to 20 ms. Work call on a busy evening (S5): 93%, 79%, 0.1%; delay 36 to 24 ms. Line drops to a fifth (S2): 56%, 56%, 0.9%; delay 502 to 20 ms. Against plain CAKE over 90 seed-paired runs: 49 better, 41 tied, 0 worse. On fresh seeds 21 better, 29 tied, 0 worse. Never worse than threshold rules; better than cake-autorate in 20 of 20 runs.">
 <defs>
-<pattern id="rw" x="0" y="0" width="11.75" height="16" patternUnits="userSpaceOnUse"><rect x="0" y="0" width="10" height="16" rx="2" fill="#6250d6"/></pattern>
-<pattern id="rt" x="0" y="0" width="11.75" height="16" patternUnits="userSpaceOnUse"><rect x="0" y="0" width="10" height="16" rx="2" fill="#c9cdd6"/></pattern>
+<pattern id="rw" x="0" y="0" width="7.05" height="16" patternUnits="userSpaceOnUse"><rect x="0" y="0" width="5.6" height="16" rx="1.5" fill="#6250d6"/></pattern>
+<pattern id="rt" x="0" y="0" width="7.05" height="16" patternUnits="userSpaceOnUse"><rect x="0" y="0" width="5.6" height="16" rx="1.5" fill="#c9cdd6"/></pattern>
 </defs>
 <g font-family="Arial, Helvetica, sans-serif" fill="#14213d">
 <text x="0" y="13" font-size="12" font-weight="700">Late frames:</text>
@@ -315,39 +312,38 @@
 <text x="0" y="42" font-size="14" font-weight="700">HD call, laptop</text><text x="0" y="60" font-size="13" fill="#4a5568">sharing files · S6</text>
 <rect x="176" y="28" width="283" height="13" rx="2" fill="#2a78d6"/><text x="465" y="39" font-size="12" fill="#4a5568">94%</text>
 <rect x="176" y="44" width="283" height="13" rx="2" fill="#eb6834"/><text x="465" y="55" font-size="12" fill="#4a5568">94%</text>
-<rect x="176" y="60" width="5" height="13" rx="1" fill="#6250d6"/><text x="187" y="72" font-size="14" font-weight="700">1.7%</text>
-<text x="636" y="54" font-size="14" font-weight="700" text-anchor="end">1.8 s → 17 ms</text>
+<rect x="176" y="60" width="5" height="13" rx="1" fill="#6250d6"/><text x="187" y="72" font-size="14" font-weight="700">0.6%</text>
+<text x="636" y="54" font-size="14" font-weight="700" text-anchor="end">1.8 s → 18 ms</text>
 <line x1="0" y1="78" x2="636" y2="78" stroke="#e6e9f0" stroke-width="1"/>
 
 <text x="0" y="100" font-size="14" font-weight="700">Cloud game while</text><text x="0" y="118" font-size="13" fill="#4a5568">its PC updates · S7</text>
 <rect x="176" y="86" width="250" height="13" rx="2" fill="#2a78d6"/><text x="432" y="97" font-size="12" fill="#4a5568">83%</text>
 <rect x="176" y="102" width="58" height="13" rx="2" fill="#eb6834"/><text x="240" y="113" font-size="12" fill="#4a5568">19%</text>
-<rect x="176" y="118" width="2" height="13" fill="#6250d6"/><text x="184" y="130" font-size="14" font-weight="700">0.6%</text>
-<text x="636" y="112" font-size="14" font-weight="700" text-anchor="end">925 → 18 ms</text>
+<rect x="176" y="118" width="3" height="13" fill="#6250d6"/><text x="185" y="130" font-size="14" font-weight="700">1.0%</text>
+<text x="636" y="112" font-size="14" font-weight="700" text-anchor="end">799 → 20 ms</text>
 <line x1="0" y1="136" x2="636" y2="136" stroke="#e6e9f0" stroke-width="1"/>
 
 <text x="0" y="158" font-size="14" font-weight="700">Work call on a</text><text x="0" y="176" font-size="13" fill="#4a5568">busy evening · S5</text>
 <rect x="176" y="144" width="279" height="13" rx="2" fill="#2a78d6"/><text x="461" y="155" font-size="12" fill="#4a5568">93%</text>
-<rect x="176" y="160" width="222" height="13" rx="2" fill="#eb6834"/><text x="404" y="171" font-size="12" fill="#4a5568">74%</text>
+<rect x="176" y="160" width="236" height="13" rx="2" fill="#eb6834"/><text x="418" y="171" font-size="12" fill="#4a5568">79%</text>
 <rect x="176" y="176" width="2" height="13" fill="#6250d6"/><text x="184" y="188" font-size="14" font-weight="700">0.1%</text>
-<text x="636" y="170" font-size="14" font-weight="700" text-anchor="end">36 → 27 ms</text>
+<text x="636" y="170" font-size="14" font-weight="700" text-anchor="end">36 → 24 ms</text>
 <line x1="0" y1="194" x2="636" y2="194" stroke="#e6e9f0" stroke-width="1"/>
 
 <text x="0" y="216" font-size="14" font-weight="700">Line drops to</text><text x="0" y="234" font-size="13" fill="#4a5568">a fifth · S2</text>
 <rect x="176" y="202" width="167" height="13" rx="2" fill="#2a78d6"/><text x="349" y="213" font-size="12" fill="#4a5568">56%</text>
 <rect x="176" y="218" width="167" height="13" rx="2" fill="#eb6834"/><text x="349" y="229" font-size="12" fill="#4a5568">56%</text>
 <rect x="176" y="234" width="3" height="13" fill="#6250d6"/><text x="185" y="246" font-size="14" font-weight="700">0.9%</text>
-<text x="636" y="228" font-size="14" font-weight="700" text-anchor="end">503 → 20 ms</text>
+<text x="636" y="228" font-size="14" font-weight="700" text-anchor="end">502 → 20 ms</text>
 
-<text x="0" y="270" font-size="13" fill="#4a5568">Against plain CAKE, every seed-paired run (9 scenarios × 6 seeds = 54):</text>
-<rect x="0" y="276" width="340.75" height="16" fill="url(#rw)"/>
-<rect x="340.75" y="276" width="282" height="16" fill="url(#rt)"/>
-<rect x="622.75" y="276" width="10" height="16" rx="2" fill="#c0392b"/>
-<text x="0" y="308" font-size="13" font-weight="700">29 better</text>
-<text x="340.75" y="308" font-size="13" font-weight="700">24 tied</text>
-<text x="636" y="308" font-size="13" text-anchor="end">1 worse (cause fixed)</text>
-<text x="0" y="328" font-size="13" font-weight="700">Never worse than threshold rules in any run</text>
-<text x="636" y="328" font-size="13" text-anchor="end">9 scenarios: 5.58 → 0.73 unusable flows</text>
+<text x="0" y="270" font-size="13" fill="#4a5568">Against plain CAKE, every seed-paired run (9 scenarios × 10 seeds = 90):</text>
+<rect x="0" y="276" width="345.45" height="16" fill="url(#rw)"/>
+<rect x="345.45" y="276" width="289.05" height="16" fill="url(#rt)"/>
+<text x="0" y="308" font-size="13" font-weight="700">49 better</text>
+<text x="345.45" y="308" font-size="13" font-weight="700">41 tied</text>
+<text x="636" y="308" font-size="13" font-weight="700" text-anchor="end">0 worse</text>
+<text x="0" y="328" font-size="13" font-weight="700">Fresh seeds: 21 better, 29 tied, 0 worse</text>
+<text x="636" y="328" font-size="13" text-anchor="end">Never worse than rules · 20/20 vs cake-autorate</text>
 </g>
 </svg>
 
@@ -355,16 +351,16 @@
 <h3 style="position:absolute;left:1316px;top:656px;width:568px;font-family:'Space Grotesk', Arial, sans-serif;font-size:27px;font-weight:700;line-height:1.15;color:#14213d">Small, fast, and fails safe</h3>
 <div style="position:absolute;left:1316px;top:700px;width:568px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
 <div style="display:flex;flex-direction:column;gap:2px">
-<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">0.97 · 0.80</p>
-<p style="font-size:15px;line-height:1.3;color:#4a5568">accuracy · macro-F1 on 43,221 held-out records (model v2)</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">0.97 · 0.73</p>
+<p style="font-size:15px;line-height:1.3;color:#4a5568">accuracy · macro-F1 on the sealed test set: 1,213 unseen flows, opened once</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:2px">
 <p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">6 µs</p>
 <p style="font-size:15px;line-height:1.3;color:#4a5568">per flow in Go; no Python on the router, same answers</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:2px">
-<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">10× · 8×</p>
-<p style="font-size:15px;line-height:1.3;color:#4a5568">faster and smaller than a random forest of equal quality</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">3.6%</p>
+<p style="font-size:15px;line-height:1.3;color:#4a5568">of one CPU core for the whole controller; the classifier 0.04%</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:2px">
 <p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">2 s</p>
@@ -375,12 +371,12 @@
 <p style="font-size:15px;line-height:1.3;color:#4a5568">fuzzed bad proposals; none got past the safety shield</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:2px">
-<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">16% → 0%</p>
-<p style="font-size:15px;line-height:1.3;color:#4a5568">unseen video-call apps sent to Bulk, before and after the guard</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:34px;font-weight:700;line-height:1.05;color:#14213d">57% → 2.4%</p>
+<p style="font-size:15px;line-height:1.3;color:#4a5568">late frames on a real WhatsApp video call, replayed: CAKE, then AQoSE</p>
 </div>
 </div>
 <p style="position:absolute;left:1316px;top:980px;width:568px;font-size:15px;line-height:1.35;color:#4a5568"><b style="color:#14213d">Built with</b> Linux tc-CAKE diffserv4 · conntrack marks · Go controller, classifier and watchdog · LightGBM trained in Python · rootless network-namespace testbed</p>
 
-<p style="position:absolute;left:36px;top:1040px;width:1848px;font-size:14px;line-height:1.3;color:#4a5568"><b style="color:#14213d">How it was tested:</b> 9 emulated home situations × 5 router setups (no QoS, plain CAKE, threshold rules, top label, AQoSE), identical traffic per seed, paired statistics with bootstrap intervals and Holm correction, A/A noise band. The final run adds cake-autorate, fresh seeds and an unseen scenario. <b style="color:#14213d">Limits:</b> one laptop, no real router or Wi-Fi yet; generated calls don't lower their bitrate when squeezed; weaker on apps never seen in training. Interim: 6 of 10 seeds, final numbers Oct 17.</p>
-<aside>Reference slide for the design team, not the final layout. The top-left and top-right corners are kept clear for the Teliport and Tata Elxsi logos from the submission template. Result numbers are interim (6 of 10 seeds, pre-freeze system); the final report replaces them around Oct 17, along with the model figures. Worked example in panel 3 uses the real measured damage table: game 45%, backup 55% gives Voice 1.10 (barred by the voice bar), Video 1.10, Best Effort 1.95, Bulk 2.70, so Video. Colours: purple #6250d6 is AQoSE in every chart; plain CAKE #2a78d6, threshold rules #eb6834, top label #1baf7a, no QoS #898781. Sources: reports/handover, reports/core-6seeds.md, Project Log.</aside>
+<p style="position:absolute;left:36px;top:1040px;width:1848px;font-size:14px;line-height:1.3;color:#4a5568"><b style="color:#14213d">How it was tested:</b> 9 emulated home situations × 6 router setups (no QoS, plain CAKE, cake-autorate, threshold rules, top label, AQoSE), 10 seeds of identical traffic each; then, after the system was frozen, 5 fresh seeds, a new scenario and replayed real WhatsApp calls. Paired statistics, bootstrap intervals, A/A noise band. <b style="color:#14213d">Limits:</b> one laptop, no real router or Wi-Fi yet; generated calls don't lower their bitrate when squeezed; weaker on apps from sources never seen in training.</p>
+<aside>Reference slide for the design team, not the final layout. Final numbers, Oct 16: the frozen system on seeds 0 to 9 (results-final), fresh seeds 10 to 14 (results-fresh), replayed real calls (results-realcall), the sealed test set opened once (head-to-head-v2-test). The QR code and the link go to the public results page. Worked example in panel 3 uses the real measured damage table: game 45%, backup 55% gives Voice 1.10 (barred by the voice bar), Video 1.10, Best Effort 1.95, Bulk 2.70, so Video. Colours: purple #6250d6 is AQoSE in every chart; plain CAKE #2a78d6, threshold rules #eb6834, top label #1baf7a, no QoS #898781. The full report is reports/paper/aqose-report.pdf.</aside>
 </section>

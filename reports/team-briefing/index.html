@@ -129,18 +129,17 @@ dl.terms dd { margin: 0; color: var(--muted); min-width: 0; }
   <p class="kicker">For the AQoSE team · Thursday Oct 15, 2026 · internal, not the submission</p>
   <h1>How AQoSE works, and what happened this week</h1>
   <p class="lede">The architecture and the engineering behind AQoSE, part by part with the real settings, then how the evidence is produced, what it shows so far and what is still running. Written in plain language; every number is measured.</p>
-  <p class="note">The numbers on this page are from the main experiment, which finished this morning. They are close to final but not final: the frozen system is being re-tested right now, and those results replace these on Friday.</p>
+  <p class="note">Updated Oct 16 with the final results of the frozen system. The detailed results page and the PDF report have every table.</p>
 </header>
 
 <section>
   <p class="kicker">Right now</p>
   <h2>Where things stand</h2>
   <ul class="status-list">
-    <li><span class="pill done">Done</span><span>The system is built, trained and tested: 450 test runs plus 90 noise-check runs, every one valid.</span></li>
-    <li><span class="pill done">Done</span><span>The system was <strong>frozen</strong> at 07:41 today: no more changes to it, so the final tests are fair.</span></li>
-    <li><span class="pill run">Running</span><span>Final tests of the frozen system, including fresh test settings and a brand-new home situation. Ends around <strong>Fri Oct 16, 9 AM</strong>.</span></li>
-    <li><span class="pill run">Waiting</span><span>Real WhatsApp video calls replayed in the test network, to check the system works on real traffic and not only on our own fake traffic. Starts by itself after the final tests; ends around <strong>Fri noon</strong>.</span></li>
-    <li><span class="pill next">Next</span><span>Final report (PDF) and the one-slide summary with final numbers: <strong>Friday afternoon or evening</strong>. Submission deadline: <strong>Oct 23</strong>.</span></li>
+    <li><span class="pill done">Done</span><span>Built, trained and tested: 1,026 runs in all, every one valid.</span></li>
+    <li><span class="pill done">Done</span><span>Frozen on Oct 15 at 07:41, then tested on fresh seeds, a new scenario, cake-autorate and two real WhatsApp calls. The sealed test set was opened once.</span></li>
+    <li><span class="pill done">Done</span><span>Final report: a 13-page PDF (<span class="mono">reports/paper/aqose-report.pdf</span>), the public results page, and the one-slide summary with a QR code to that page.</span></li>
+    <li><span class="pill next">Next</span><span>The case study, written by the literature and design team. Submission deadline: <strong>Oct 23</strong>.</span></li>
   </ul>
 </section>
 
@@ -452,12 +451,12 @@ host-tv      ─┘   CAKE, aqosd           rate      delay     generators,
 <section class="wide">
   <p class="kicker">Results so far</p>
   <h2>It fixes the case CAKE gets wrong, and ties it everywhere else</h2>
-  <p style="max-width: var(--measure)">"Late frames" means video or game frames that arrived too late to show, so the picture freezes or stutters. Above about 5% a call visibly stutters; above 20% it is unusable. Numbers below are the middle value over 10 repeats.</p>
+  <p style="max-width: var(--measure)">"Late frames" means video or game frames that arrived too late to show, so the picture freezes or stutters. Above about 5% a call visibly stutters; above 20% it is unusable. Numbers below are the final ones: the frozen system, middle value over 10 repeats.</p>
   <div class="big-row">
-    <div class="big"><b>94% → 1.7%</b><span>late frames on an HD video call while the same laptop shares files (S6). Plain CAKE, then AQoSE.</span></div>
-    <div class="big"><b>83% → 0.7%</b><span>late frames on a cloud game while the same PC downloads a game update (S7).</span></div>
-    <div class="big"><b>93% → 0.2%</b><span>late frames on a work call on a busy evening at home, with a backup running (S5).</span></div>
-    <div class="big"><b>0 of 90</b><span>test pairs where AQoSE did worse than the threshold rules existing tools use. It won 52 and tied 38.</span></div>
+    <div class="big"><b>94% → 0.6%</b><span>late frames on an HD video call while the same laptop shares files (S6). Plain CAKE, then AQoSE.</span></div>
+    <div class="big"><b>83% → 1.0%</b><span>late frames on a cloud game while the same PC downloads a game update (S7).</span></div>
+    <div class="big"><b>57% → 2.4%</b><span>late frames on a real WhatsApp video call, replayed packet for packet, on a laptop sharing files (S12).</span></div>
+    <div class="big"><b>0 of 140</b><span>paired runs where AQoSE did worse than plain CAKE (70 better, 70 tied), including fresh seeds. Never worse than the threshold rules.</span></div>
   </div>
   <figure>
     <img src="charts/timeline-S7.png" alt="Line chart of a cloud game over time. With plain CAKE, late frames jump to almost 100% when the game update starts and stay there. With AQoSE, there is one short spike and then almost none." width="1440" height="624" loading="lazy">
@@ -468,24 +467,24 @@ host-tv      ─┘   CAKE, aqosd           rate      delay     generators,
       <thead><tr><th>Situation</th><th>What happens in it</th><th>Plain CAKE</th><th>AQoSE</th><th>Result</th></tr></thead>
       <tbody>
         <tr><td class="tag">S1</td><td>A big download starts during a video call (on another device)</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
-        <tr><td class="tag">S2</td><td>The internet line suddenly drops to a fifth of its speed during a call</td><td class="n">56% late</td><td class="n">1.0% late</td><td class="win">AQoSE better*</td></tr>
+        <tr><td class="tag">S2</td><td>The internet line suddenly drops to a fifth of its speed during a call</td><td class="n">56% late</td><td class="n">0.9% late</td><td class="win">AQoSE better*</td></tr>
         <tr><td class="tag">S3</td><td>Three TVs streaming and a game console</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
         <tr><td class="tag">S4</td><td>A cloud backup fills the upload during a game (on another device)</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
-        <tr><td class="tag">S5</td><td>Work call on a laptop that is backing up, busy evening</td><td class="n">93% late</td><td class="n">0.2% late</td><td class="win">AQoSE better</td></tr>
-        <tr><td class="tag">S6</td><td>HD video call on a laptop that is also sharing files</td><td class="n">94% late</td><td class="n">1.7% late</td><td class="win">AQoSE better</td></tr>
-        <tr><td class="tag">S7</td><td>Cloud game on a PC that is downloading a game update</td><td class="n">83% late</td><td class="n">0.7% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S5</td><td>Work call on a laptop that is backing up, busy evening</td><td class="n">93% late</td><td class="n">0.1% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S6</td><td>HD video call on a laptop that is also sharing files</td><td class="n">94% late</td><td class="n">0.6% late</td><td class="win">AQoSE better</td></tr>
+        <tr><td class="tag">S7</td><td>Cloud game on a PC that is downloading a game update</td><td class="n">83% late</td><td class="n">1.0% late</td><td class="win">AQoSE better</td></tr>
         <tr><td class="tag">S8</td><td>Traffic that changes: camera off and on, game lobby then match</td><td class="n">62% late</td><td class="n">0% late</td><td class="win">AQoSE better</td></tr>
         <tr><td class="tag">S10</td><td>Things break: the speed checks go silent, then AQoSE is killed</td><td class="n">fine</td><td class="n">fine</td><td class="tie">tie</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note" style="max-width: var(--measure)">* S2 is won by a different part of AQoSE, the line-speed checker, not by the traffic recogniser. Any tool that adapts to line speed should win it, which is why cake-autorate (B3) is in the final tests. If it matches us, we say "as good as the standard tool, built in".</p>
+  <p class="note" style="max-width: var(--measure)">* S2 is won by a different part of AQoSE, the line-speed checker, not by the traffic recogniser. Any tool that adapts to line speed should win it, so cake-autorate (B3) was tested too: it gets S2 to 4.6% late, AQoSE to 0.9%, and on S5 cake-autorate does nothing (93%).</p>
   <p style="max-width: var(--measure)"><strong>Why the ties are good news.</strong> In S1, S3, S4 and S10 each call or game is alone on its device. CAKE's fairness already protects it there, so nobody can do better than CAKE, and AQoSE doesn't get in the way. Our measurements predicted this before those tests ran. So the claim is: <strong>AQoSE beats CAKE when a call or game shares its device with heavy traffic, and ties it otherwise.</strong></p>
   <figure>
     <img src="charts/total-cost.png" alt="Bar chart of flows left unusable over all nine situations, middle of ten repeats: no QoS 12.21, plain CAKE 5.54, threshold rules 6.61, our model with the simple choice 1.74, AQoSE 0.66." width="1280" height="576" loading="lazy">
-    <figcaption>All 9 situations added up: how many calls, games, streams or downloads ended up unusable. No QoS 12.2, plain CAKE 5.5, threshold rules 6.6, our model with the simple choice 1.7, AQoSE 0.7. The threshold rules do worse than plain CAKE because they push calls and games into the slow lane. Use this as a summary, not a headline: the exact ratio depends on which situations we chose.</figcaption>
+    <figcaption>All 9 situations added up: how many calls, games, streams or downloads ended up unusable. No QoS 12.2, plain CAKE 5.5, threshold rules 6.6, our model with the simple choice 0.70, AQoSE 0.69. The threshold rules do worse than plain CAKE because they push calls and games into the slow lane. Use this as a summary, not a headline: the exact ratio depends on which situations we chose.</figcaption>
   </figure>
-  <p style="max-width: var(--measure)"><strong>The model on its own.</strong> On 43,221 samples of recorded traffic it was never trained on, the current model labels 97% correctly. On apps from a data source it never saw at all, it does much worse, which is our main known weakness (see below).</p>
+  <p style="max-width: var(--measure)"><strong>The model on its own.</strong> On the sealed test set (1,213 real flows from 183 sessions, opened once) it labels 97% correctly, and sends no video call or cloud game to the slow lane; qosify's default rules send 78% of cloud-gaming flows there. On apps from a data source it never saw at all, it does much worse, which is our main known weakness (see below).</p>
 </section>
 
 <section>
