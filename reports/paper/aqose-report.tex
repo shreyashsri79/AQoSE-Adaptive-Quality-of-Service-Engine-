@@ -93,20 +93,17 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 \end{tabular}
 \end{table}
 
-\begin{itemize}
-\item \textbf{Against plain CAKE}, over every seed-paired run of the frozen system: better in 49, tied in 41, worse in 0 (seeds 0--9); better in 21, tied in 29, worse in 0 on fresh seeds never used in development.
-\item \textbf{Against the threshold rules} existing tools use: never worse in any run (52 better and 38 tied on seeds 0--9).
-\item \textbf{Against cake-autorate}, the community tool for changing line speed: better in 20 of 20 runs.
-\item \textbf{Real traffic.} Replayed real WhatsApp video calls were recognised as video calls within 0.13 s in all 20 runs and kept in the Video tin; late frames fell from 57\% to 2.4\% and from 79\% to 14\%.
-\item \textbf{Sealed test set}, opened once: accuracy 0.969 and macro-F1 0.73 on 1,213 flows from 183 unseen sessions; no video call or cloud-gaming flow sent to Bulk (qosify's defaults: 14\% and 78\%).
-\item \textbf{Cost}: the controller uses about 3.6\% of one laptop core; classifying one connection takes about 6\,\textmu s in Go.
-\item \textbf{The model against a deterministic baseline.} Over the nine scenarios, threshold rules leave 6.61 flows unusable, the classifier alone 0.70 and the full system 0.69 (medians of ten seeds). The measurable improvement comes from the classifier.
+\begin{itemize}[itemsep=1pt,topsep=4pt]
+\item \textbf{Against plain CAKE}, every seed-paired run of the frozen system: better in 49, tied in 41, worse in 0 on seeds 0--9, and 21, 29, 0 on fresh seeds never used in development.
+\item \textbf{Against cake-autorate}, the community tool for changing line speed, better in all 20 runs: 0.9\% late frames against its 4.6\% when the line slows (S2), and 0.1\% against 93.3\% on a call sharing its device with a backup (S5), which no rate setting can fix.
+\item \textbf{Real traffic.} Two real WhatsApp calls, replayed, were recognised within 0.13\,s in all 20 runs; late frames 57\% $\to$ 2.4\% (a call the model never trained on) and 79\% $\to$ 14\% (a larger one it trained on).
+\item \textbf{Sealed test set}, opened once: accuracy 0.969 and macro-F1 0.73 on 1,213 flows from 183 unseen sessions; no video call or cloud game sent to Bulk, partly by design, as UDP is never demoted (qosify's defaults: 14\% and 78\%).
+\item \textbf{Against the threshold rules} existing tools use, never worse in any run (52 better, 38 tied). Over the nine scenarios they leave 6.61 flows unusable, the classifier alone 0.70, the full system 0.69: the improvement comes from the classifier.
 \item \textbf{No starvation, fairness kept.} Bulk transfers keep a median 98\% of their plain-CAKE throughput (75--104\% by scenario) and never starve more than under plain CAKE; Jain's fairness index between devices is unchanged within $\pm0.01$.
-\item \textbf{Jitter, loss, link estimation.} Where plain CAKE lost up to 91\% of a call's packets, AQoSE lost at most 0.03\%. After the line drops, its estimator is under the new rate within 2\,s, with a steady-state error of 6\% (cake-autorate: 20\%).
-\item \textbf{IPv6 end to end.} The HD-call situation run entirely over IPv6 (S14, three seeds): late frames 94.3\% $\to$ 0.3\%, p95 latency 1,788\,ms $\to$ 19\,ms.
+\item \textbf{Jitter, loss, link estimation.} A call's packet loss stayed at most 0.03\% where plain CAKE lost up to 91\%. After the line drops, the estimator is under the new rate within 2\,s, with 6\% steady-state error (cake-autorate: 20\%). IPv6 end to end (S14): late frames 94.3\% $\to$ 0.3\%.
 \end{itemize}
 
-The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists what these results do not show. Everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
+The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
 
 \clearpage\phantomsection
 \tableofcontents
@@ -132,7 +129,7 @@ Three ideas carry the design. Everything else in this section supports them.
 \item \textbf{Re-check cheaply.} After the first decision, a check each second compares the connection's traffic, read from the kernel's counters, with the normal range of its class. No model runs. The classifier is asked again only when a connection stays outside its range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds. Over 80 runs, 165,684 per-second checks led to 5,453 classifications: 3.3\%.
 \end{enumerate}
 
-Figure~\ref{fig:ideas} follows two connections through the first two ideas, with the real numbers from the measured damage table.
+Figure~\ref{fig:ideas} follows two connections through the first two ideas, with harms from the measured damage table and illustrative odds.
 
 \begin{figure}[H]\centering
 \includegraphics[width=\linewidth]{diagrams/ideas.pdf}
@@ -492,6 +489,8 @@ S1, S3, S4, S10 & late \% & 53--78 & 0.0 & 0.0--0.3 & 0.0 & \ours{0.0} & \\
 
 Summed over the nine scenarios, the number of flows left unusable is 12.21 with no queue management, 5.54 with plain CAKE, 6.61 with threshold rules, 0.70 with top label and \textbf{0.69 with AQoSE} (medians of ten seeds). The ratio to CAKE depends on the scenario mix and is a summary, not a claim about homes in general. Seed by seed, AQoSE was better than plain CAKE in 49 runs, tied in 41 and worse in none; better than the threshold rules in 52 and tied in 38.
 
+\paragraph{Why plain CAKE's latency exceeds no queue management in S6} The 1,786\,ms is the call's upload (its download: 860\,ms). Without queue management the modem's 500\,ms buffer caps every packet's delay. Under plain CAKE the laptop's 19\,Mbit/s upload is shared between the call and ten file-sharing connections, so the call gets about 1.7\,Mbit/s of the 5\,Mbit/s it sends; most of the excess is dropped (65\% of its upload packets in seed 0) and the rest waits in the call's own queue for close to two seconds. The baseline works as designed; the share is the problem.
+
 \begin{figure}[H]\centering
 \includegraphics[width=0.92\linewidth]{against-cake.png}
 \caption{AQoSE against each rival, paired by seed: median difference in summed cost and 95\% interval. Left of zero AQoSE is better.}
@@ -546,7 +545,7 @@ Noise $\sigma$ & Accuracy & \multicolumn{2}{c}{Offline damage} & \multicolumn{2}
 \caption{Offline, expected damage beats top label at every noise level. Live (three seeds per cell) it did not: with a weaker classifier it left the S6 call worse.}
 \end{table}
 
-We therefore do not claim a live benefit for expected damage. It is a principled way to combine uncertain predictions with measured costs, and offline it lowers damage by 20--45\%, but in the live tests its value is as the frame for the guards, not as the source of the wins.
+We therefore do not claim a live benefit for expected damage. It is a principled way to combine uncertain predictions with measured costs, and offline it lowers damage by 22\% with the full classifier and by 6--17\% with a weakened one, but in the live tests its value is as the frame for the guards, not as the source of the wins.
 
 \subsection{Bulk progress and fairness}
 Protecting a call must not starve everything else. Table~\ref{tab:bulk} compares every bulk transfer's throughput under AQoSE with the same transfer under plain CAKE on the same seed. No transfer was starved more than under plain CAKE (a second under 100\,kbit/s; the only scenario with many such seconds is S8, whose update is paused on purpose, identically in both). Jain's index over the devices' throughput is unchanged within $\pm0.01$ in every scenario, on both the main and the fresh seeds.
@@ -646,7 +645,7 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 
 \paragraph{Performance} On the laptop the controller uses 3.6\% of one core and the classifier 0.04\%. A router's cores are several times slower, so we expect several times these figures; measuring them is the first next step. At high line rates on small routers, CAKE's own cost is likely to be the first limit, not AQoSE's.
 
-\paragraph{Hardware} OpenWrt routers already ship CAKE, nftables, the \texttt{ctinfo} action and IFB devices; the Go programs cross-compile to their processors as single files, and the model is 2\,MB of data. Hardware or software flow offloading must be off, since offloaded packets bypass the queue that CAKE manages. ISP-supplied routers with closed firmware would need the vendor's integration.
+\paragraph{Hardware} OpenWrt routers already ship CAKE, nftables, the \texttt{ctinfo} action and IFB devices; the Go programs cross-compile to their processors as single files, and the model is a 2\,MB file of trees. Hardware or software flow offloading must be off, since offloaded packets bypass the queue that CAKE manages. ISP-supplied routers with closed firmware would need the vendor's integration.
 
 \paragraph{Operations} Models are versioned directories, and every run records the model, damage table and code version it used, so a model update can be rolled out to a few routers first, compared on tin delay and rollback counts, and rolled back. The watchdog is the kill switch. Telemetry, if any, should be opt-in and aggregate (counts of decisions and tin delays, no addresses). Thresholds, bounds and the damage table are configuration files, not code.
 
@@ -696,7 +695,7 @@ Everything so far ran in emulation. These are the steps that would turn the prot
 \section{Conclusion}
 Home routers already have a very good queue manager in CAKE, and AQoSE does not try to replace it. It answers the one question CAKE cannot: which of the connections on a busy device is the call or the game. A small, calibrated tree model that reads only the headers of a connection's first eight packets is enough to answer it, in about six microseconds, and the answer is written once per connection as a label the kernel already knows how to use. No AQoSE code sits on the per-packet path.
 
-The evidence, all of it in emulation, is consistent. Where CAKE's fairness cannot help, a call or a game sharing its device with bulk traffic, late frames fell from 83--94\% to around 1\% across the main scenarios, on ten seeds and again on five fresh seeds the system had never seen. Real WhatsApp video calls, replayed packet for packet, were recognised within a fraction of a second and their late frames fell from 57\% to 2.4\% and from 79\% to 14\%. Where CAKE already works, AQoSE ties it, including on a home it was never tuned for. In 140 paired runs it was never worse than plain CAKE, never worse than the threshold rules existing tools use, and better than cake-autorate in all 20 runs where both were tested. On the sealed test set of real traffic it labelled 97\% of flows correctly and sent no call or cloud game to the slow lane, where qosify's defaults sent 78\% of cloud-gaming flows.
+The evidence, all of it in emulation, is consistent. Where CAKE's fairness cannot help, a call or a game sharing its device with bulk traffic, late frames fell from 83--94\% to around 1\% across the main scenarios, on ten seeds and again on five fresh seeds the system had never seen. Real WhatsApp video calls, replayed packet for packet, were recognised within a fraction of a second and their late frames fell from 57\% to 2.4\% and from 79\% to 14\%. Where CAKE already works, AQoSE ties it, including on a home it was never tuned for. In 140 paired runs it was never worse than plain CAKE, never worse than the threshold rules existing tools use, and better than cake-autorate in all 20 runs where both were tested, 10 of them where the line's speed changed. On the sealed test set of real traffic it labelled 97\% of flows correctly and sent no call or cloud game to the slow lane, where qosify's defaults sent 78\% of cloud-gaming flows.
 
 The work also showed what does not carry the result. The expected-damage rule is a sound way to combine uncertain predictions with measured costs, but in live tests the classifier did the work: recognising the traffic at all is what fixes CAKE's blind spot. The model is much weaker on data sources it has never seen, CAKE's tin shares limit what any label can do for very large flows, and every result so far comes from one laptop.
 
