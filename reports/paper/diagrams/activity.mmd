@@ -12,10 +12,10 @@ flowchart TD
     E --> K["CAKE sends the call's packets first<br/>up to half the line"]
     I --> L["The backup takes what is left"]
     J --> L
-    K --> M{{"Each second:<br/>has anything changed?"}}
+    K --> M{{"Each second, a cheap check, no model:<br/>still inside its class's normal range?"}}
     L --> M
-    M -->|"camera off, call ends, backup finishes"| D
-    M -->|"no"| K
+    M -->|"outside for 2 to 6 s in a row,<br/>or the routine recheck every 30 to 60 s"| D
+    M -->|"inside"| K
     K --> N(["END: the call stays smooth<br/>under 1% late frames instead of 94%"])
     classDef ends fill:#5242c4,stroke:#5242c4,color:#ffffff
     classDef tin fill:#ebe8fb,stroke:#5242c4,color:#171a2b

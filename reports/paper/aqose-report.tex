@@ -124,7 +124,7 @@ The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{AQoSE 
 \section{Design}
 
 \subsection{What happens, step by step}
-Figure~\ref{fig:activity} follows an ordinary evening: a video call starts on a laptop, and the same laptop then starts a cloud backup. The router recognises each connection from its first eight packets, puts the call in the Video tin and the backup in Bulk (or Best Effort when it is not sure), and keeps checking every second.
+Figure~\ref{fig:activity} follows an ordinary evening: a video call starts on a laptop, and the same laptop then starts a cloud backup. The router recognises each connection from its first eight packets and puts the call in the Video tin and the backup in Bulk (or Best Effort when it is not sure). After that, a cheap check each second compares each connection's traffic with its class's normal range; the classifier is asked again only when a connection stays outside that range for 2 to 6 seconds, or at a routine recheck every 30 to 60 seconds.
 
 \begin{figure}[H]\centering
 \includegraphics[width=0.78\linewidth]{diagrams/activity.pdf}
@@ -208,13 +208,13 @@ The kernel forwards every packet and CAKE queues it. AQoSE writes one label per 
 \node[check,below=of k4] (k5) {\textbf{5} Safety shield:\\ within every limit?};
 \node[box,below=of k5] (k6) {\textbf{6} Enforcer writes the conntrack mark and reads it back};
 \node[box,below=of k6] (k7) {\textbf{7} CAKE queues every packet of the flow in its tin, both directions};
-\node[check,below=of k7] (k8) {\textbf{8} Each second:\\ still like its class?};
+\node[check,below=of k7] (k8) {\textbf{8} Each second: still\\ inside its normal range?};
 \node[ends,below=of k8] (end) {END: connection closes};
 \node[safe,right=1.1cm of k5] (plain) {Stays in plain CAKE};
 \draw[arr] (start)--(k1); \draw[arr] (k1)--(k2); \draw[arr] (k2)--(k3); \draw[arr] (k3)--(k4);
 \draw[arr] (k4)--(k5); \draw[arr] (k5)--node[right,font=\scriptsize]{accept}(k6); \draw[arr] (k6)--(k7);
 \draw[arr] (k7)--(k8); \draw[arr] (k8)--node[right,font=\scriptsize]{connection ends}(end);
-\draw[arr] (k8.west) -| ([xshift=-7mm]k3.west) node[pos=0.75,left,font=\scriptsize,align=right]{changed:\\ ask again} -- (k3.west);
+\draw[arr] (k8.west) -| ([xshift=-7mm]k3.west) node[pos=0.75,left,font=\scriptsize,align=right]{outside 2--6\,s,\\ or routine\\ recheck:\\ ask again} -- (k3.west);
 \draw[exitarr] (k5.east)--node[above,font=\scriptsize]{reject}(plain.west);
 \draw[exitarr] (k3.east) -| node[pos=0.75,right,font=\scriptsize]{timeout or error}(plain.north);
 \draw[exitarr] (k6.east) -| node[pos=0.75,right,font=\scriptsize]{mismatch: undo}(plain.south);
