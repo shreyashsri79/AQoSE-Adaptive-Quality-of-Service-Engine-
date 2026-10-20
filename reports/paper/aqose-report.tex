@@ -65,7 +65,8 @@
 \vspace{1.2cm}
 {\large Full project report}\par\vspace{0.2cm}
 {\color{muted} Tata Elxsi Teliport, Season 4\\ Team: Shreyash Neeraj, Mridul Jaiswal, Sachi Jha\\ October 16, 2026}\par\vspace{0.5cm}
-{\small Source code, data pipeline, results and this report:\\ \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}}
+{\small Source code, data pipeline, results and this report:\\ \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}}\par\vspace{0.3cm}
+{\small Project explanation video:\\ \href{https://youtu.be/k6ccbBaxwUg}{\texttt{youtu.be/k6ccbBaxwUg}}}
 \vfill
 \begin{minipage}{\linewidth}\small\color{muted}
 Every number in this report was measured in emulation, on one laptop (Fedora 43, Linux 7.2.8, 12th-gen Intel Core i5, 16 threads), in a rootless network-namespace testbed. The system has not yet run on a real router or in a real home. Source, results and every script that produced them are in the public repository, \url{https://github.com/shreyashsri79/aqose}.
@@ -103,7 +104,7 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 \item \textbf{Jitter, loss, link estimation.} A call's packet loss stayed at most 0.03\% where plain CAKE lost up to 91\%. After the line drops, the estimator is under the new rate within 2\,s, with 6\% steady-state error (cake-autorate: 20\%). IPv6 end to end (S14): late frames 94.3\% $\to$ 0.3\%.
 \end{itemize}
 
-The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{In emulation, AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} It has not yet run on a real router or in a real home. Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}.
+The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{In emulation, AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} It has not yet run on a real router or in a real home. Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. A video explaining the project is at \href{https://youtu.be/k6ccbBaxwUg}{\texttt{youtu.be/k6ccbBaxwUg}}.
 
 \clearpage\phantomsection
 \tableofcontents

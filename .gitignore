@@ -27,3 +27,16 @@ __pycache__/
 FREEZE-STATUS
 freeze-check.log
 REALCALL-STATUS
+# Explainer video: rendered output and the voice model are not committed.
+/reports/video/*.mp4
+/reports/video/node_modules/
+/reports/video/package-lock.json
+/reports/video/preview/
+/reports/video/join-*.txt
+/reports/video/tts/venv/
+/reports/video/tts/lines-*/
+/reports/video/tts/part*.json
+/reports/video/tts/*.onnx
+/reports/video/tts/*.bin
+/reports/round1/__pycache__/
+/reports/round1/variants/
