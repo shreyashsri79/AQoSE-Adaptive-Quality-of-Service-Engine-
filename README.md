@@ -13,7 +13,7 @@
 <p align="center">
   <a href="reports/paper/aqose-report.pdf"><img alt="Full report" src="https://img.shields.io/badge/report-PDF-1C3F86?style=for-the-badge"></a>
   <a href="https://youtu.be/k6ccbBaxwUg"><img alt="Explainer video" src="https://img.shields.io/badge/video-YouTube-C8452B?style=for-the-badge"></a>
-  <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=for-the-badge&logo=go&logoColor=white">
+  <img alt="Rust 1.99" src="https://img.shields.io/badge/Rust-1.99-CE422B?style=for-the-badge&logo=rust&logoColor=white">
   <img alt="Python 3.14" src="https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white">
   <img alt="LightGBM" src="https://img.shields.io/badge/LightGBM-4.7-6A4FD0?style=for-the-badge">
   <img alt="Linux CAKE" src="https://img.shields.io/badge/Linux-CAKE-1D8A5A?style=for-the-badge&logo=linux&logoColor=white">
@@ -84,7 +84,7 @@ Median late video or game frames over 10 seeds, frozen system:
 
 <p align="center"><img src="docs/images/how-the-model-works-minimal.png" alt="28 flow features go into 259 decision trees, which output calibrated probabilities for 7 classes" width="85%"></p>
 
-**The classifier** is LightGBM: 37 boosting rounds for each of 7 classes, 259 trees, calibrated with temperature scaling. It reads 28 numbers: 8 packet sizes signed by direction, the 7 gaps between them, IP version, protocol, the port *class* of each end (never raw port numbers) and 9 window statistics. The trees are exported as data and run in Go, where one answer takes about 6 µs. It was trained on 246,274 records from seven sources, split by capture session, never by record.
+**The classifier** is LightGBM: 37 boosting rounds for each of 7 classes, 259 trees, calibrated with temperature scaling. It reads 28 numbers: 8 packet sizes signed by direction, the 7 gaps between them, IP version, protocol, the port *class* of each end (never raw port numbers) and 9 window statistics. The trees are exported as data and run in Rust; the measured inference median is about 6.4 µs on the reference laptop. It was trained on 246,274 records from seven sources, split by capture session, never by record.
 
 <table>
 <tr>
@@ -114,7 +114,7 @@ CAKE does the queuing. AQoSE only picks the tin: Voice has priority up to 25% of
 
 Every change, from any part of the system, passes the same checks:
 
-- **Safety shield**: a pure function. It rejects invalid or stale proposals, a third lane change for one flow within 60 s, and more than 50 re-marks a second; it clamps rate changes to safe steps. Go's fuzzer threw 10.9 million generated proposals at it with no violation, and six planted bugs were each caught in under a second.
+- **Safety shield**: a pure function. It rejects invalid or stale proposals, a third lane change for one flow within 60 s, and more than 50 re-marks a second; it clamps rate changes to safe steps. The Go reference shield passed 10.9 million fuzzed proposals and caught six planted bugs. The migrated Rust shield has its own property, contract and generative stress tests; those historical Go counts are not Rust test results.
 - **Transactions**: snapshot, apply, read back, compare. A mismatch restores the snapshot.
 - **QoE verifier**: after a promotion, if Voice/Video delay rose by more than 5 ms *and* more than half, the change is undone.
 - **Watchdog**: a separate process. If the controller's heartbeat goes quiet for 2 s, it removes the marking rules and restores plain CAKE. In 20 of 20 kills that took 2.03–2.06 s.
@@ -146,16 +146,223 @@ Every change, from any part of the system, passes the same checks:
 
 ## <img src="docs/images/kid-architecture.png" width="44" align="top"> Quick start
 
-Linux with CAKE, nftables and user namespaces; Go 1.26 and Python 3.14. Versions are pinned in [VERSIONS.md](VERSIONS.md).
+Linux with CAKE, nftables and user namespaces; Rust 1.99, Go 1.26 for the
+experiment testbed, and Python 3.14 for research tooling. Versions are pinned in [VERSIONS.md](VERSIONS.md).
 
 ```bash
 make venv    # create .venv from requirements.lock
 make env     # compare this machine against VERSIONS.md
-make check   # Go vet and tests, Python tests (about a minute)
-make build   # binaries into bin/
+make check   # Rust format/clippy/tests, Go reference checks, Python and parity tests
+make build   # Rust runtime commands and the Go testbed into bin/
 
 scripts/demo.sh   # the whole loop in ~8 minutes, no sudo: S6 with plain CAKE, then with AQoSE, side by side
 ```
+
+Rust is now the default for the complete router runtime and classifier.
+`make build` installs the familiar `bin/aqosd`, `bin/aqos-classify`,
+`bin/aqos-extract`, `bin/aqos-ctl`, `bin/aqos-cake-reader`, `bin/aqos-reflector`,
+`bin/aqos-watchdog`, and `bin/aqos-exporter` command names as Rust aliases.
+The `-rs` names remain available. The model and Unix-socket contracts are preserved.
+Its model loader validates class coverage, child bounds, cycles and calibration
+before constructing an inference-ready model. Probability distributions and
+validated records have separate types; the crate forbids unsafe Rust.
+
+```bash
+# Requires Rust/Cargo (tested with 1.99.1); Cargo.lock pins dependencies.
+make build-rust
+make test-rust      # Rust checks and differential Go/Rust socket tests
+make bench-rust     # paired core + service benchmarks, raw JSON in reports/
+
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.run one \
+  --scenario S6 --config O2 --seed 7 --results results-rust
+```
+
+The Rust runtime includes flow extraction, the shield and enforcer, capacity
+probing, reclassification, verification and rollback, the intent API, CAKE
+metrics, the reflector, the Prometheus exporter, and an independent watchdog.
+The watchdog has its own crate and does not depend on the controller or model.
+Python training/reporting/traffic generation and the Go namespace testbed remain.
+
+```bash
+make build
+make test-runtime           # format, clippy, Rust tests, Go/Rust feature parity
+make testbed-check          # full integration suite using the default Rust commands
+make fuzz FUZZTIME=150s     # seeded Rust generative stress, not coverage-guided fuzzing
+
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.run one \
+  --scenario S6 --config O2 --seed 7 --results results-rust-runtime
+
+# Dashboard exporter is selected directly; the runner does not launch it.
+bin/aqos-exporter -file results-rust-runtime/current/metrics.jsonl -listen :9108
+
+.venv/bin/python scripts/bench-runtime.py
+# Paired live CPU benchmark; requires a fresh output directory and owns the testbed:
+.venv/bin/python scripts/bench-runtime-controller.py --trials 3 \
+  --results reports/rust-runtime-controller-comparison-new
+```
+
+The runner defaults to `AQOS_RUNTIME=rust` and `AQOS_SERVICE=rust`; neither
+variable is needed for normal runs. `AQOS_RUNTIME_DIR` can select another
+Rust build. Missing binaries fail before the testbed is touched. Dataset builds
+also use the canonical Rust extractor.
+
+Go runtime sources are retained as comparison references, separately built:
+
+```bash
+make build-go-reference  # bin/go/*; never replaces a Rust command
+PYTHONPATH=ml AQOS_RUNTIME=go AQOS_SERVICE=go .venv/bin/python -m aqos_ml.run one \
+  --scenario S6 --config O2 --seed 7 --results results-go-reference
+```
+
+Historical results without backend metadata are treated as Go. Use a fresh
+results directory for Rust runs; cached results from another backend are refused.
+B4 remains the Python rules reference. Feature-noise research experiments use
+`AQOS_SERVICE=python AQOS_SERVE_ARGS="--feature-noise 1.0"` explicitly; production
+Rust selection never silently falls back to another implementation.
+
+To stage the eight production commands for deployment without the Go testbed:
+
+```bash
+make install-runtime DESTDIR=/tmp/aqos-package PREFIX=/usr
+```
+
+The [staged-install check](reports/rust-full-migration-install.json) verifies all
+eight commands and processes a flow through the installed extractor/classifier.
+This target produces `/tmp/aqos-package/usr/bin/aqos*`. The router processes need Linux
+networking facilities and `ip`, `tc`, and `nft`; they need neither Go nor Python.
+Supply the existing model, damage-table and shield-config paths when launching
+the classifier/controller. This staging target builds for the host architecture;
+OpenWrt target compilation and on-device validation remain separate work.
+
+The [full migration validation](reports/rust-full-migration-validation.json)
+records the default build, staged installation, 23 integration tests, and
+5.95 million seeded Rust stress cases. Twenty forced kill/stop trials restored
+verified safe forwarding in 2.05–2.11 seconds. A combined capacity/intent test
+lowered the shaper from 95 Mbit/s to about 18 Mbit/s after the link dropped to
+20 Mbit/s, with no enforcement errors or capture overflows. Raw artifacts are
+kept in [the capacity/intent run](reports/rust-full-migration-capacity-intent/).
+
+The [default-build checks](reports/rust-full-migration-checks.txt) and
+[runtime checks](reports/rust-runtime-tests.txt) cover counter resets,
+malformed packets, shield bounds, classifier deadlines and stale replies,
+capacity recovery, reclassification sequences, leases, and metrics rotation.
+[Kernel checks](reports/rust-runtime-kernel-tests.txt) exercise IPv4/IPv6
+capture and marking, foreign mark preservation, read-back restoration, partial
+cleanup, and watchdog retry/recovery. [Live controller checks](reports/rust-runtime-controller-tests.txt)
+passed B4, O1 and O2 on the short call/download scenario. These are short host
+namespace tests. The six-hour soak has also passed, as recorded below; the full
+Rust scenario matrix and OpenWrt validation remain outstanding.
+
+The continuous stability harness runs Rust O2 with gaming traffic, a saturated
+download, five new short flows per second, and repeated capacity changes:
+
+```bash
+make soak-runtime SOAK_RESULTS=results-rust-soak-1
+# Short harness check (does not establish six-hour stability):
+make soak-runtime SOAK_SECONDS=90 SOAK_RESULTS=results-rust-soak-smoke-1
+```
+
+The default is six measured hours plus ten seconds of warm-up. It owns the
+isolated testbed for the whole run, uses one attempt, and refuses an existing
+results directory. `soak.json` records binary hashes, outcome, peak memory and
+file descriptors; `resources.jsonl` contains process CPU/RSS/descriptor samples.
+Ctrl-C or SIGTERM requests teardown through the runner. The harness stops if
+less than 1 GiB of disk space remains and marks the run failed. It also rejects
+missing evidence, service failures, enforcement errors, overflows, unexpected
+process replacement and watchdog recovery. Memory trends are diagnostic, not a
+proof of leak freedom. The exporter and physical-router behavior need separate
+validation. No reminder or background schedule is created by this command.
+
+The [harness validation](reports/rust-soak-validation.json) records two short
+runs and the ownership/interruption checks. The first six-hour attempt stopped
+after about 31 minutes when the disk reserve was reached; its evidence remains
+in `results-rust-soak-6h/soak.json`. After storage cleanup, the release build
+reproduced all nine Rust command binaries byte for byte, and 35 Rust tests plus
+eight harness checks passed ([resume validation](reports/rust-resume-validation.json)).
+The retry completed all six measured hours and passed
+([final validation](reports/rust-six-hour-validation.json)). It recorded 53,251
+label applications and 2,039 rate changes with no enforcement errors, read-back
+mismatches, service timeouts, capture overflows or process replacements. Controller
+RSS peaked at 6.12 MiB and its final sample-window median was 4.93 MiB. The service
+exited successfully and the testbed was removed. Raw evidence remains in
+`results-rust-soak-6h-retry/`. This is host namespace validation; the exporter was
+not exercised, and physical-router performance and leak freedom are not established.
+
+[Runtime measurements](reports/rust-runtime-benchmark.json) use seven alternating
+trials on a single CPU, after two warmups, with 50,000 flows / 400,000 packets
+and identical output records. The [live CPU comparison](reports/rust-runtime-controller-comparison/comparison.json)
+uses three alternating Go/Rust pairs on the short O2 scenario, keeping the Rust
+classifier fixed in both implementations.
+
+| Runtime measurement | Go | Rust | Change |
+| --- | ---: | ---: | ---: |
+| Offline initial-flow extraction, median | 326 ms | 244 ms | 1.34× faster |
+| Extractor peak RSS, median | 65.82 MiB | 57.64 MiB | 12.4% lower |
+| Controller CPU per short live run, median | 0.695 s | 0.395 s | 43.2% lower |
+
+Controller CPU excludes child `tc`/`nft` processes. The first Go trial overlapped
+the end of the regression suite; the median comes from a later trial. The extractor benchmark
+measures initial records with window generation disabled. Neither result
+establishes forwarding throughput, saturated-controller latency, router memory
+use, network QoE gains, or six-hour stability. Raw trials and binary hashes
+are retained so these component-level results can be reproduced.
+
+Use separate result directories for Go and Rust comparisons. Rust selection
+fails if its binary/model is missing or Python-only service flags are requested.
+The [optimisation benchmark](reports/rust-optimization.json) records compiler and binary
+versions, corpus hashes, CPU affinity, individual repetitions and paired speedup
+intervals. It measures this laptop's classifier, not router throughput or
+end-to-end call quality. The benchmark compares implementations: data layout and
+allocation choices differ, so it does not isolate programming language alone.
+
+On the reference i5-1240P laptop, seven matched repetitions over the same 2,000
+records gave the following medians (release Rust, one CPU per service). The
+previous Rust binaries were saved before editing and measured in the same run:
+
+| Measurement | Go | Previous Rust | Optimised Rust |
+| --- | ---: | ---: | ---: |
+| Inference only | 9.34 µs | 9.49 µs | 6.43 µs |
+| Feature vector + inference + decision | 11.02 µs | 9.39 µs | 6.50 µs |
+| Socket request latency, p50 | 39.98 µs | 24.50 µs | 19.26 µs |
+| Socket request latency, p95 | 51.42 µs | 32.20 µs | 27.49 µs |
+| Resident memory after requests | 11.57 MiB | 5.52 MiB | 5.45 MiB |
+
+The service's paired median speedup against Go was 2.09× (95% bootstrap interval
+2.03–2.12×); against previous Rust it was 1.29× (1.25–1.30×). Inference also
+improved: 1.45× against Go and 1.48× against previous Rust. Resident memory is
+about 53% below Go; the small difference between Rust versions is within noise.
+The release service binary fell from 2.00 MiB to 1.66 MiB, including symbol
+stripping. These results support this component's migration; they do not
+establish that a complete Rust rewrite would improve network performance.
+
+The optimisation uses four-byte validated tree references and resolves NaN
+routing at model load, retaining `f64` arithmetic and checked array accesses.
+The service serialises borrowed typed responses directly into a reusable output
+buffer, formats explanations into a reusable string, and generates ID text on
+the stack. It avoids per-request probability hash maps and intermediate JSON
+trees. Unused YAML serialization dependencies are disabled. No async runtime or
+CPU-specific compiler flags are needed. Request parsing still allocates; this
+is not a claim of zero allocations for a complete request.
+
+To include an older Rust build in a comparison, save its `aqos-classify-rs` and
+`aqos-core-bench-rs` binaries together before rebuilding, then run:
+
+```bash
+.venv/bin/python scripts/bench-rust.py --out reports/rust-optimization.json \
+  --baseline-dir bin/rust-baseline
+```
+
+[Optimisation validation](reports/rust-optimization-validation.json) includes 2,000 reference
+records, 4,000 differential socket requests across both decision modes, malformed
+input and split-boundary tests, and two live namespace runs using the existing Go controller,
+shield and CAKE. Reproduce the live integration check with:
+
+```bash
+AQOS_INTEGRATION=1 AQOS_RUNTIME=go AQOS_SERVICE=rust .venv/bin/pytest -q -s \
+  ml/tests/test_controller_testbed.py::test_model_in_the_controller
+```
+
+As with the existing testbed checks, this replaces any running AQoSE testbed.
 
 <p align="center">
   <a href="https://youtu.be/k6ccbBaxwUg"><img src="docs/images/video-thumbnail.png" alt="Watch the explainer video" width="60%"></a><br>

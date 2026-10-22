@@ -19,7 +19,7 @@ RECORD = Draft202012Validator(json.loads((REPO / "contracts/schema/feature_recor
 
 @pytest.fixture(scope="module", autouse=True)
 def extractor():
-    subprocess.run(["go", "build", "-o", build.EXTRACT, "./cmd/aqos-extract"], cwd=REPO, check=True)
+    subprocess.run(["make", "build"], cwd=REPO, check=True)
 
 
 def test_file_names_map_to_classes():

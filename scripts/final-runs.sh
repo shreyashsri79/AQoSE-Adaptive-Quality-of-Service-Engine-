@@ -19,7 +19,7 @@ echo "== b3 $(date '+%a %H:%M')"; run configs/matrix-final-b3.yaml --results res
 echo "== fresh $(date '+%a %H:%M')"; run configs/matrix-final-fresh.yaml --results results-fresh
 for noise in 0.5 1.0 1.5; do
     echo "== ablation $noise $(date '+%a %H:%M')"
-    AQOS_SERVE_ARGS="--feature-noise $noise" run configs/matrix-ablation.yaml --results "results-ablation-$noise"
+    AQOS_SERVICE=python AQOS_SERVE_ARGS="--feature-noise $noise" run configs/matrix-ablation.yaml --results "results-ablation-$noise"
 done
 echo "== reports $(date '+%a %H:%M')"
 .venv/bin/python -m aqos_ml.report --results results-final --aa results-aa --out reports/final.md

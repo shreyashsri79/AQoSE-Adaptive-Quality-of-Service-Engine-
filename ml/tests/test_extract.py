@@ -1,9 +1,10 @@
-"""Checks the Go extractor from outside: its records follow the contract,
+"""Checks the default extractor from outside: its records follow the contract,
 and they agree with a second implementation written separately."""
 
 import importlib.util
 import ipaddress
 import json
+import os
 import random
 import struct
 import subprocess
@@ -19,8 +20,13 @@ KEY = "00" * 32
 
 @pytest.fixture(scope="module")
 def extract(tmp_path_factory):
-    binary = tmp_path_factory.mktemp("bin") / "aqos-extract"
-    subprocess.run(["go", "build", "-o", binary, "./cmd/aqos-extract"], cwd=REPO, check=True)
+    if selected := os.environ.get("AQOS_EXTRACT_BIN"):
+        from pathlib import Path
+        binary = Path(selected).resolve(strict=True)
+    else:
+        binary = REPO / "bin/aqos-extract"
+        if not binary.exists():
+            subprocess.run(["make", "build"], cwd=REPO, check=True)
 
     def run(pcap, *args):
         out, keys = pcap.with_suffix(".features.jsonl"), pcap.with_suffix(".keys.jsonl")

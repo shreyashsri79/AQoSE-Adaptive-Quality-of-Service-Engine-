@@ -32,7 +32,7 @@ flowchart TB
             CAKE["CAKE diffserv4<br/>upload and download"]
         end
 
-        subgraph AQOSD["aqosd, the controller (Go)"]
+        subgraph AQOSD["aqosd, the controller (Rust)"]
             direction TB
             EXT["Feature extractor"]
             REC["Reclassifier<br/>envelope check, once per second"]
@@ -86,20 +86,68 @@ Solid arrows carry decisions, dotted arrows carry observations, and the thick ar
 | Process | Language | Runs in | Owner | Role |
 | --- | --- | --- | --- | --- |
 | `aqos-testbed` | Go | Host | Systems | Builds and tears down namespaces, links and impairments from a scenario file |
-| `aqosd` | Go | Router namespace | Systems | The controller: extractor, flow table, shield, enforcer, capacity estimator, envelope checks, intent API, heartbeat |
-| `aqos-watchdog` | Go, standard library only | Router namespace | Systems | Applies the safe CAKE configuration when the controller stops |
-| `aqos-extract` | Go | Host | Systems | Offline: turns a pcap into feature records with the same code `aqosd` uses |
+| `aqosd` / `aqosd-rs` | Rust | Router namespace | Systems | The controller: extractor, flow table, shield, enforcer, capacity estimator, envelope checks, intent API, heartbeat |
+| `aqos-watchdog` / `aqos-watchdog-rs` | Independent Rust crate | Router namespace | Systems | Applies the safe CAKE configuration when the controller stops |
+| `aqos-extract` / `aqos-extract-rs` | Rust | Host | Systems | Offline: turns a pcap into feature records with the same code `aqosd` uses |
+| `aqos-classify` | Rust | Router namespace | Systems / ML | Default native model inference and decision service |
+| `aqos-classify-rs` | Rust (alias) | Router namespace | Systems / ML | Explicit alias for the default native inference and decision service |
 | `aqos_ml.serve` | Python | Router namespace | ML | Local service: classify, decide, verify |
 | `aqos_ml.gen` | Python | Host and server namespaces | ML | Traffic generators and their servers |
 | `aqos_ml.run` | Python | Host | ML | Experiment runner |
 | `aqos_ml.train`, `aqos_ml.report` | Python | Host | ML | Training, statistics, charts |
-| `aqos-exporter` | Go | Host | Systems | Tails the current run's `metrics.jsonl` and serves it to Prometheus |
+| `aqos-exporter` / `aqos-exporter-rs` | Rust | Host | Systems | Tails the current run's `metrics.jsonl` and serves it to Prometheus |
 | Prometheus, Grafana | Containers | Host | Systems | Dashboard |
+
+The Rust implementation optimises work per **flow record**. CAKE continues to
+queue packets in the kernel. The classifier uses fixed feature/probability
+arrays, compact validated tree references, and reusable response buffers. Its
+release build uses link-time optimisation and strips symbols; it has no async
+runtime. Model validation, `f64` calculations, policy guards, and bounds checks
+remain enabled. Performance changes must preserve reference probabilities and
+Go service decisions, then show a gain in repeated matched benchmarks. The
+[README](README.md) links the measurements and live controller validation;
+laptop classifier timings do not establish router throughput or network QoE.
+
+The default runtime is Rust (`AQOS_RUNTIME=rust`), with the Rust classifier
+selected independently by default (`AQOS_SERVICE=rust`). `aqos-ctl-rs`, `aqos-cake-reader-rs`, and `aqos-reflector-rs`
+complete the runtime tools. The host testbed and Python research tooling retain
+their existing languages. Go runtime implementations are comparison references
+under `bin/go/`, built only by `make build-go-reference`; they cannot overwrite
+the canonical Rust command names. `make check` covers all three Rust crates,
+Go references and Python tooling. `make install-runtime` stages only Rust commands.
+
+The Rust controller owns mutable flow state on one event loop. Classifier work
+uses a bounded nonblocking Unix connection with deadlines and request IDs;
+late answers cannot act on expired or replaced flows. Heartbeats come from the
+working controller loop. Kernel updates are read back before confirming state.
+A counter decrease resets the complete statistics window, including byte-only
+resets. Pinned flows retain their last confirmed tin until clearing succeeds.
+
+The independent Rust watchdog retries failed restoration and publishes its
+`.safe` marker only after verifying both rates, zero CAKE mark masks, removal
+of AQoSE marking rules and a plain ingress redirect. It also handles a controller
+that never emits its first heartbeat. It has no dependency on the runtime or
+classifier crates; its limited netlink/command code is deliberately independent.
+
+On the supported testbed, Rust adds the AQoSE ctinfo redirect at priority 9,
+leaving B2's priority-10 plain redirect in place. Cleanup removes priority 9.
+These priorities are reserved for AQoSE/B2. Legacy Go ctinfo at priority 10 must
+be returned to B2 before changing implementations. AQoSE owns only mark bits
+`0x7`; foreign bits are preserved. Clearing CAKE's mark mask uses an explicit
+zero netlink attribute, since this host's `tc ... fwmark 0` omits the update.
+
+Rust and Go use the same envelope thresholds and backoff bounds; Rust uses a
+local xorshift PRNG for jitter, so exact periodic check times are not identical.
+The intent HTTP service bounds simultaneous clients and request sizes; leases
+use monotonic expiry during a process and persisted wall-clock expiry on restart.
+The exporter bounds input lines and series; oversized/malformed lines are skipped.
+See the README for executed tests and the remaining soak/router validation.
 
 ### 1.2 Planned repository layout
 
 ```
-cmd/            aqos-testbed, aqos-extract, aqos-cake-reader, aqos-exporter, aqos-ctl, aqos-watchdog, aqosd, aqos-reflector (built)
+rust/           aqos-classify, aqos-runtime, aqos-watchdog (production)
+cmd/            aqos-testbed (active harness); Go reference commands: aqos-extract, aqos-cake-reader, aqos-exporter, aqos-ctl, aqos-watchdog, aqosd, aqos-reflector (built)
 internal/       testbed, extract, netfilter, capture, cake, exporter, runclock, enforce, heartbeat, shield, controller, capacity, intent (built); envelope
 contracts/      schemas, examples, Go types, taxonomy          (built)
 ml/aqos_ml/     gen, capture, run, dataset, rules, evaluate, features, train, model, serve, decide, damage (built); verify, report
@@ -130,7 +178,7 @@ data/           captures and datasets                           (raw data git-ig
 - Python 3.14 virtual environment in `.venv`. `requirements.txt` pins direct dependencies; `requirements.lock` pins the full resolved set and was confirmed to reproduce exactly in a fresh environment.
 - [VERSIONS.md](VERSIONS.md) records every pinned version, including Grafana 13.2.3 and Prometheus 3.15.0 by container tag.
 - `make env` runs `scripts/check-env.sh`, which fails on a missing required tool, a version mismatch, a missing kernel module or a virtual environment that differs from the lock file.
-- `make check` runs `gofmt`, `go vet`, the Go tests and the Python tests (contracts and `ml/tests`). It takes about 35 s, most of it the generators running against each other on localhost.
+- `make check` builds the default Rust commands, runs Rust formatting/clippy/tests and differential contracts, then Go reference checks and the Python suite. The Go testbed remains development tooling.
 - `make testbed-check` builds the real testbed and runs traffic through it. It replaces any running testbed and takes about a minute, so it is separate.
 
 Open: the second laptop has not been checked, and three optional tools are not installed (`conntrack-tools`, `iperf3`, `irtt`).
@@ -607,7 +655,7 @@ The rules sit behind the same interface as the model so the two are scored ident
 - **Check.** The watchdog reads the file's age every 250 ms. An age over 2 s triggers the safe state.
 - **Safe state.** Remove the marking rule and filter; set both CAKE instances to the configured conservative fixed rates with `diffserv4`. Existing conntrack marks are left in place and are simply no longer read.
 - **Timing.** Detection takes at most 2.25 s, leaving 0.75 s for the two `tc` commands and the rule removal inside the PRD's 3 s limit.
-- **Dependencies.** Go standard library plus the `tc` and `nft` binaries. It reads its rates from a small file written at startup and shares no code with the controller.
+- **Dependencies.** Independent Rust crate with serde/serde_json, rustix and signal-hook, plus `ip`, `tc` and `nft`. It reads its rates from a small file written at startup and shares no runtime code with the controller.
 - **Recovery.** When the heartbeat returns, the watchdog does nothing. The controller reinstalls marking itself as part of its startup.
 
 The PRD says both "misses heartbeats for 3 s" and "reaches safe state within 3 s". Both cannot hold, so the timeout here is 2 s and the 3 s figure is the end-to-end limit.
@@ -669,7 +717,7 @@ Derived features (for example bytes in each direction among the first 8) may be 
 
 This request format is a contract: `service_request` and `service_response` in `contracts/`.
 
-**Runtime choice.** Default is the Python service above. Running the model inside Go with a library such as `leaves` is considered only if the version check passes and the measured inference time through the socket is a problem.
+**Runtime choice (migrated).** The default is the Rust native service with validated exported trees. Python remains explicit for the B4 rules reference and feature-noise experiments. Go is a separately built comparison reference.
 
 **Failure.** The controller gives each request a deadline (starting value 50 ms) and keeps a bounded queue of pending requests (starting value 1,024). A timeout, an error or a full queue leaves the flow unlabelled.
 
@@ -790,13 +838,13 @@ The shield is a pure function of a proposal and the current state. It returns ac
 
 **Internal errors.** A panic inside the shield is recovered and turned into a reject.
 
-**Fuzzing.** Go's native fuzzer generates proposals and states. The property: the result is a reject, or it satisfies every bound above. The corpus is seeded with the contract examples and their invalid variants.
+**Generative testing.** `make fuzz` runs seeded, time-bounded stress against the production Rust shield, mutated proposal JSON, and packet headers. An independent oracle checks every accepted result against the bounds above. It is not coverage-guided. `make fuzz-go-reference` retains the Go reference coverage-guided targets.
 
 **Done when.** The fuzzer runs for a fixed time budget with no violation and every hand-written invalid proposal is rejected.
 
-**As built.** `internal/shield`. `Check` is the pure function; `Tracker` keeps the state between proposals; bounds are in `configs/shield.yaml`.
+**As built.** `rust/aqos-runtime/src/shield.rs` is production; `internal/shield` is the Go reference. `check` is the pure function; `Tracker` keeps state; bounds are in `configs/shield.yaml`.
 
-- **Result.** Two fuzz targets, one building proposals from numbers and one fed raw bytes seeded with the contract examples. 10.9 million proposals in 5 minutes, no violation. Six bugs planted on purpose (one for each bound) were each found in under a second, which is the evidence that the property being checked is the right one. `make fuzz` repeats it.
+- **Historical Go-reference result.** Two fuzz targets, one building proposals from numbers and one fed raw bytes seeded with the contract examples. 10.9 million proposals in 5 minutes, no violation. Six bugs planted on purpose (one for each bound) were each found in under a second, which is the evidence that the property being checked is the right one. `make fuzz-go-reference` repeats those reference targets; these historical counts do not describe the Rust implementation.
 - **The property is written twice.** The test's check of a verdict is written from the tables above, apart from `Check`, so a mistake has to be made twice to pass.
 - **Added: stale proposals are rejected.** If the flow's current tin or the current rate is not what the proposal says it was, the proposer decided on old information.
 - **What counts as a label change.** A flow's first label is not one. The flip cap and the per-second budget count changes from one tin to another. First labels are limited by the classification cap in chunk 6A.
@@ -805,7 +853,7 @@ The shield is a pure function of a proposal and the current state. It returns ac
 - **A proposal that clamps to no change at all** is rejected, so the log does not fill with changes that changed nothing.
 - **Every verdict has a code** besides its sentence (`flip_cap`, `rate_step` and so on), for counters and for the controller.
 - **Starvation.** The detector takes one reading per host per interval: whether it has packets queued, and its throughput. Where the per-host queue reading comes from is settled in chunk 6A; CAKE reports backlog per tin, not per host.
-- **Limit.** Go's JSON decoder cannot tell a missing key from a null one, so a proposal that leaves out a key the contract requires but allows to be null is accepted. Unknown keys are rejected.
+- **Required nullable fields.** The Rust decoder distinguishes missing required keys from explicit null and rejects omissions. Unknown keys are rejected. The older Go reference accepted missing nullable keys.
 
 ### 7.5 Chunk 5E: core dashboard panels (M13, Systems, written; not yet seen live)
 
@@ -914,7 +962,7 @@ S1 to S4, S6 to S8 and S10 as scenario files, with the event arguments the testb
 
 ### 9.1 Chunk 7A: reclassifier (M6, ML for logic, Systems for plumbing, Built)
 
-**Split of work.** ML supplies `envelopes.json`, the thresholds and a file of test cases with expected outcomes. Systems implements the check in Go inside the controller and must pass those test cases. The check is too frequent to send through the service.
+**Split of work.** ML supplies `envelopes.json`, the thresholds and a file of test cases with expected outcomes. Systems implements the check in Rust inside the controller and must pass those test cases. The check is too frequent to send through the service.
 
 **Check.** Once per second, for each labelled flow, count how many of the nine window features lie outside the envelope of the flow's current class. A window is "outside" when at least k features are out (starting value k = 2).
 
@@ -930,9 +978,9 @@ Why k is not 1: each envelope covers 90% of training flows per feature, so a per
 
 **Reason string.** Names the feature that was furthest outside, the class range, and the duration, in the form of the PRD's example.
 
-**Done when.** The Go check passes every ML test case, and S8 shows changes detected with reclassifications per flow per minute staying low.
+**Done when.** The Rust check passes every ML test case, and S8 shows changes detected with reclassifications per flow per minute staying low.
 
-**As built.** `ml/aqos_ml/envelope.py` is the ML side's definition of the check and writes the test cases; `internal/reclass` is the check in Go and passes them (`internal/reclass/testdata/cases.json`, eleven sequences built from the chosen model's envelopes). `aqosd -envelopes <model>/envelopes.json` switches it on, and the runner passes that for `O1` and `O2`. `B4` has no classes to have envelopes for and keeps asking about every flow every 5 s.
+**As built.** `ml/aqos_ml/envelope.py` is the ML side's definition of the check and writes the test cases; `rust/aqos-runtime/src/reclass.rs` is the production check and passes the same cases as the Go reference in `internal/reclass` (`internal/reclass/testdata/cases.json`, eleven sequences built from the chosen model's envelopes). `aqosd -envelopes <model>/envelopes.json` switches it on, and the runner passes that for `O1` and `O2`. `B4` has no classes to have envelopes for and keeps asking about every flow every 5 s.
 
 - **How a flow is asked about, with the reclassifier on.** The extractor sends a window record every second. An unlabelled flow is asked about every fifth one, as before. A labelled flow is asked about in three cases only: it has been outside its class's range for long enough, its routine recheck is due, or its last answer wanted it moved and needs confirming.
 - **Settings, the starting values:** k = 2; two outside seconds in a row for a flow in Voice or Video; for a flow in Best Effort or Bulk a check every other second and three in a row, so about 6 s. Routine recheck at a random moment 30 to 60 s after the last answer.
@@ -966,7 +1014,7 @@ The noise band comes from A/A runs: the spread of the same metric between identi
 
 **As built.** `internal/verify` is the verdict, a pure function with its own tests; `internal/controller/verifier.go` records, judges and undoes. Every verdict is a line in the run's `verifier.jsonl`, with the figures it was reached from, and the counts are in `controller.json`.
 
-- **The verdict is computed in the controller, not by the ML service.** The design sent the three windows to the service in a `verify` request. The rule is a comparison of means against a band; it needs no model, and keeping it in Go avoids a new request in the contract and a second way for the service being slow to matter.
+- **The verdict is computed in the controller, not by the ML service.** The design sent the three windows to the service in a `verify` request. The rule is a comparison of means against a band; it needs no model, and keeping it in the Rust controller avoids a new request in the contract and a second way for the service being slow to matter.
 - **What it sees:** once a second, the delay CAKE reports for the Voice and Video tins (the worse of the two and of the two directions), and the capacity estimator's probe delay above its baseline. A tin's figure is used only for seconds in which the tin sent packets, because CAKE's figure for an idle tin is whatever its last packet saw. Per-flow throughput, drops and backlog are not used yet.
 - **Verdict:** a figure is worse when it rose by more than 5 ms and by more than half of what it was, in both 5 s windows; better likewise. Either figure worse in both windows is regressed. A figure with fewer than three samples in any of the three windows is not judged, and with none judged the verdict is neutral.
 - **A promotion into an empty tin cannot be judged**, because there is no "before". The first call or game of an evening is therefore never rolled back, and what the verifier really asks of a promotion is what it did to the flows already in Voice and Video.
@@ -1119,7 +1167,7 @@ A CI check also asserts that the capture snap length stays at 64 bytes and that 
 | ~~Do nflog delivery and conntrack mark updates work in a rootless namespace, or does the testbed need `sudo`?~~ | Answered in 2A: both work rootless, no `sudo` (section 2.3) |
 | ~~Can Python generators hold timing at cloud-gaming packet rates?~~ | Answered in 2B: yes, 113 µs at the 99th percentile (section 4.2) |
 | Is DSCP rewriting toward the LAN worth adding, given the mark already selects the tin? | 4C |
-| Python service or in-process Go inference? | 5A |
+| Inference runtime | Resolved: separate Rust native service; Python/Go references explicit |
 | Sigmoid or isotonic calibration? | 5A |
 | Cost formulas, budgets and harm weight for the damage table | 5B |
 | Envelope trigger settings (k and window count) | 7A |

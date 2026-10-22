@@ -24,6 +24,9 @@ __pycache__/
 # The random forest is 12 MB and is not the chosen model; training rebuilds it.
 /models/rf-*/model.joblib
 /third_party/
+/rust/aqos-classify/target/
+/rust/aqos-runtime/target/
+/rust/aqos-watchdog/target/
 FREEZE-STATUS
 freeze-check.log
 REALCALL-STATUS

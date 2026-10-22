@@ -27,6 +27,8 @@ want_version "kernel"   "7.2."     uname -r
 want_version "iproute2" "6.14.0"   tc -V
 want_version "nftables" "v1.1.3"   nft --version
 want_version "go"       "go1.26."  go version
+want_version "rust"     "1.99.1"   "${RUSTC:-$HOME/.cargo/bin/rustc}" --version
+want_version "cargo"    "1.99.1"   "${CARGO:-$HOME/.cargo/bin/cargo}" --version
 want_version "python"   "3.14."    python3 --version
 want_version "tcpdump"  "4.99."    tcpdump --version
 

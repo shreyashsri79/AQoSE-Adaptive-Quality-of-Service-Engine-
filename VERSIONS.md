@@ -9,7 +9,8 @@ Pinned on Oct 9, 2026 from the reference laptop. All results in the report come 
 | iproute2 (`tc`, `ip`) | 6.14.0 | This file |
 | nftables | 1.1.3 | This file |
 | tcpdump | 4.99.6 | This file |
-| Go | 1.26.8 | `go.mod` (`go 1.26`) |
+| Go (testbed and comparison references) | 1.26.8 | `go.mod` (`go 1.26`) |
+| Rust (default classifier and runtime) | 1.99.1 | `rust/{aqos-classify,aqos-runtime,aqos-watchdog}/Cargo.lock` pin dependencies; benchmark JSON records the compiler |
 | gopkg.in/yaml.v3 | 3.0.1 | `go.mod`, `go.sum` |
 | Python | 3.14.7 | This file |
 | scikit-learn | 1.9.1 | `requirements.txt` |

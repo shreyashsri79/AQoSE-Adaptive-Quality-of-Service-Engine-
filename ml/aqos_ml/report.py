@@ -178,8 +178,9 @@ def cpu_table(runs, order, configs, names):
              "| Scenario | Configuration | " + " | ".join(parts) + " |", "| --- | --- |" + " --- |" * len(parts)]
     for s, c, d in rows:
         lines.append(f"| {s} | {c} | " + " | ".join(_num(d.get(p), 2) for p in parts) + " |")
-    return lines + ["", "Measured on the reference laptop (12th-gen Intel i5, 16 threads), so a router's figures will "
-                         "be several times higher. The ML service is the Go service for O1 and O2 and Python for B4.", ""]
+    return lines + ["", "Measured on the reference laptop (12th-gen Intel i5, 16 threads). Router CPU use must be measured "
+                         "separately. Runtime and classifier selections are recorded in each run's environment.json; "
+                         "B4 uses the Python rules reference.", ""]
 
 
 def markdown(results, aa=None, scoring_path=None, seed=1):

@@ -90,3 +90,39 @@ def test_model_in_the_controller(tmp_path):
         assert rules_used <= {rule, "fallback"} and rule in rules_used
         for action in actions[:6]:
             print(f"  {action['t_s']:6.1f} s  {action['outcome']:9} {action['proposal']['reason']}")
+
+
+def test_default_rust_runtime_handles_capacity_drop_and_intent(tmp_path, monkeypatch):
+    """Exercise probes, rate enforcement, the intent HTTP API and verification together."""
+    import yaml
+    monkeypatch.delenv("AQOS_RUNTIME", raising=False)
+    monkeypatch.delenv("AQOS_SERVICE", raising=False)
+    scenario = yaml.safe_load(SCENARIO.read_text())
+    scenario.update(id="S902", name="Rust capacity and intent integration", duration_s=32, warmup_s=4)
+    scenario["traffic"][1]["start_s"] = 4
+    scenario["events"] = [
+        {"at_s": 6, "type": "intent_lease", "args": {"host": "laptop", "minutes": 1}},
+        {"at_s": 10, "type": "link_rate", "args": {"direction": "down", "rate_kbit": 20000}},
+    ]
+    path = tmp_path / "capacity-intent.yaml"
+    path.write_text(yaml.safe_dump(scenario))
+    manifest = runner.run_one(path, "O2", 19, results=tmp_path / "runs")
+    assert manifest["valid"], manifest["invalid_reason"]
+    out = tmp_path / "runs" / manifest["run_id"]
+    env = json.loads((out / "environment.json").read_text())
+    assert env["runtime"] == env["service"] == "rust"
+    report = json.loads((out / "controller.json").read_text())
+    assert report["flows"]["errors"] == report["flows"]["mismatch"] == report["extractor"]["overflows"] == 0
+    assert report["flows"]["rate_changes"] > 0
+    actions = lines(out / "actions.jsonl")
+    for action in actions:
+        validator("policy_proposal").validate(action["proposal"])
+        validator("policy_verdict").validate(action["verdict"])
+    cuts = [a for a in actions if a["outcome"] == "applied"
+            and a["proposal"]["kind"] == "shaper_rate"
+            and a["proposal"]["shaper_rate"]["direction"] == "down"
+            and a["verdict"]["applied"]["rate_kbit"] < 50000]
+    assert cuts, "capacity drop never reached the shaper"
+    lease_events = [line for line in (out / "runner.log").read_text().splitlines() if "intent_lease" in line]
+    assert len(lease_events) == 1 and '"id"' in lease_events[0], lease_events
+    assert lines(out / "verifier.jsonl"), "risky changes were never verified"

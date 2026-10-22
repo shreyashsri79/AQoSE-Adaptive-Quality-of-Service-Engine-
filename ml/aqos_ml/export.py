@@ -1,14 +1,11 @@
-"""Writes a trained LightGBM model as plain data, so that the controller
-can evaluate it in Go without Python on the router.
+"""Export trained LightGBM trees and temperature calibration for native inference.
 
   python -m aqos_ml.export                 # the chosen v2 model
-  python -m aqos_ml.export --fixture 2000  # also a test fixture for the Go side
+  python -m aqos_ml.export --fixture 2000  # shared Rust/Go reference fixture
 
-trees.json holds every tree's splits and leaf values and the temperature
-of the calibration. The Go code (internal/classify) reproduces the
-model's probabilities exactly; the fixture is the proof, checked by
-`go test ./internal/classify/`: records from the dataset with the
-probabilities and tins the Python service gives them.
+The production Rust classifier and the Go comparison implementation consume the
+same trees.json. Fixtures contain Python reference probabilities and decisions;
+make test-rust checks native model and Unix-socket contract parity.
 """
 
 import argparse

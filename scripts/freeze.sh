@@ -44,7 +44,7 @@ for spec in "S6 O2" "S7 O1" "S2 B3"; do
 done
 grep -q '"cpu_s"' results-freeze-smoke/S6-O2-s0001/controller.json || fail "the controller did not record its CPU"
 grep -q "aqos-classify" results-freeze-smoke/S6-O2-s0001/logs/ml-service.err \
-    || say "note: S6 O2 did not run the Go service (see its ml-service.err)"
+    || say "note: S6 O2 did not run the Rust service (see its ml-service.err)"
 grep -q "SHAPER" results-freeze-smoke/S2-B3-s0001/cake-autorate.b3.log \
     || fail "cake-autorate changed no rate in S2"
 

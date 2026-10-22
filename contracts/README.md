@@ -2,7 +2,7 @@
 
 These are the formats that cross the boundary between Systems and ML. Both sides build against them, so a change here needs both people to agree.
 
-The JSON Schemas in `schema/` are the source of truth. This page explains what the schemas cannot say. `make check` validates every file in `examples/` against its schema in Python, and decodes the same files into the Go types in `contracts.go`. Scenario files are read in Go with `contracts.LoadScenario`, which rejects unknown fields.
+The JSON Schemas in `schema/` are the source of truth. This page explains what the schemas cannot say. `make check` validates every file in `examples/` against its schema in Python, and checks Rust production types and the Go reference types in `contracts.go`. The Rust runtime rejects missing required nullable fields as well as unknown fields. Scenario files are read in Go with `contracts.LoadScenario`, which rejects unknown fields.
 
 | Contract | Schema | From | To |
 | --- | --- | --- | --- |
@@ -63,7 +63,7 @@ The initial record has `window: null` when no full sample exists yet, so the mod
 
 ## The ML service
 
-The controller (Go) and the classifier and decision engine (Python, `aqos_ml.serve`) are two processes joined by a Unix socket in the router namespace. Each side writes one JSON object per line.
+The controller and native classifier/decision engine are separate Rust processes joined by a Unix socket in the router namespace. `aqos_ml.serve` remains a compatible Python reference for B4 rules and explicitly selected research experiments. Each side writes one JSON object per line.
 
 | Request | Response when `ok` is true |
 | --- | --- |
@@ -135,16 +135,16 @@ These are local to a run directory and are not contracts, but the runner and the
 | `flows.jsonl` | Generator clients | One line per flow: traffic id, profile, true class, and the 5-tuple as the LAN side sees it. Holds addresses, so it never leaves the run directory |
 | `gen/<traffic_id>.<role>.json` | Each generator, last | `status` (`ok` or `error`), parameters, plan digest, counts, send-timing error. A missing file means the generator died |
 
-## Left open on purpose
+## Extensions and resolved choices
 
 - **Event arguments in scenarios** are free-form objects for now. They are tightened when the scenario definitions (6C) exist. The testbed already takes `link_rate` (`direction`, `rate_kbit`) and `link_impair` (`delay_ms`, `jitter_ms`, `loss_pct`).
 - **Traffic parameters** are still a free-form object in the schema, but the generators (2B) now define the names and reject any other. They move into the schema with 6C.
 - **Lease format** for the intent service belongs to chunk 7D.
 - **Which proposals count as structural** for the shield's rate limit and canary belongs to chunk 5D.
-- **Transport** between the Go controller and the classifier (local socket, HTTP, or in-process) is decided with the inference runtime in chunk 5A. The payloads do not change.
+- **Transport (resolved).** The Rust controller and classifier exchange JSON lines over a local Unix socket. The migrated implementations preserve the payloads used by the Go/Python references.
 
 ## Changing a contract
 
-1. Change the schema, the examples and, if needed, `contracts.go` in one commit.
+1. Change the schema, the examples, the Rust types in `rust/aqos-runtime` and `rust/aqos-classify`, and the Go reference types in `contracts.go` together.
 2. Run `make check`.
 3. A change that breaks existing records bumps `schema_version`.

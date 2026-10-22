@@ -64,12 +64,12 @@
 \vspace{0.6cm}{\color{aq}\rule{\linewidth}{1.2pt}}\par
 \vspace{1.2cm}
 {\large Full project report}\par\vspace{0.2cm}
-{\color{muted} Tata Elxsi Teliport, Season 4\\ Team: Shreyash Neeraj, Mridul Jaiswal, Sachi Jha\\ October 16, 2026}\par\vspace{0.5cm}
+{\color{muted} Tata Elxsi Teliport, Season 4\\ Team: Shreyash Neeraj, Mridul Jaiswal, Sachi Jha\\ Original study: October 16, 2026\\ Rust runtime update: October 22, 2026}\par\vspace{0.5cm}
 {\small Source code, data pipeline, results and this report:\\ \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}}\par\vspace{0.3cm}
 {\small Project explanation video:\\ \href{https://youtu.be/k6ccbBaxwUg}{\texttt{youtu.be/k6ccbBaxwUg}}}
 \vfill
 \begin{minipage}{\linewidth}\small\color{muted}
-Every number in this report was measured in emulation, on one laptop (Fedora 43, Linux 7.2.8, 12th-gen Intel Core i5, 16 threads), in a rootless network-namespace testbed. The system has not yet run on a real router or in a real home. Source, results and every script that produced them are in the public repository, \url{https://github.com/shreyashsri79/aqose}.
+The network results were measured in a rootless network-namespace testbed on one laptop (Fedora 43, Linux 7.2.8, 12th-gen Intel Core i5, 16 threads). The Rust update adds component benchmarks and a six-hour stability run on the same host. The system has not yet run on a real router or in a real home. The repository is \url{https://github.com/shreyashsri79/aqose}; local evidence paths for the runtime update are listed in Section~\ref{sec:rust-runtime}.
 \end{minipage}
 \end{titlepage}
 
@@ -102,6 +102,7 @@ S12 a real WhatsApp video call, replayed (5 seeds) & 57.0\% & -- & 42.7\% & \our
 \item \textbf{Against the threshold rules} existing tools use, never worse in any run (52 better, 38 tied). Over the nine scenarios they leave 6.61 flows unusable, the classifier alone 0.70, the full system 0.69: the improvement comes from the classifier.
 \item \textbf{No starvation, fairness kept.} Bulk transfers keep a median 98\% of their plain-CAKE throughput (75--104\% by scenario) and never starve more than under plain CAKE; Jain's fairness index between devices is unchanged within $\pm0.01$.
 \item \textbf{Jitter, loss, link estimation.} A call's packet loss stayed at most 0.03\% where plain CAKE lost up to 91\%. After the line drops, the estimator is under the new rate within 2\,s, with 6\% steady-state error (cake-autorate: 20\%). IPv6 end to end (S14): late frames 94.3\% $\to$ 0.3\%.
+\item \textbf{Rust runtime update.} Separate matched benchmarks measured 52\% lower median classifier request latency, 53\% lower classifier resident memory and 43\% less controller CPU in short runs. A six-hour Rust stability run passed. These measurements supplement the original study; the call, game, accuracy and throughput results above have not been rerun as a full Rust matrix (Section~\ref{sec:rust-runtime}).
 \end{itemize}
 
 The defensible claim is narrower than ``beats CAKE'' and sharper: \textbf{In emulation, AQoSE beats plain CAKE when a call or a game shares its device with heavy traffic, and when the line's speed changes; elsewhere it ties CAKE, and it never did worse than threshold rules.} It has not yet run on a real router or in a real home. Section~\ref{sec:limits} lists the limits; everything is reproducible from the public repository, \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. A video explaining the project is at \href{https://youtu.be/k6ccbBaxwUg}{\texttt{youtu.be/k6ccbBaxwUg}}.
@@ -622,16 +623,50 @@ Watchdog & 0.06 \\
 cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \bottomrule
 \end{tabular}
-\caption{Measured on the reference laptop; a router's processor will show several times these figures.}
+\caption{Historical Go-runtime measurements on the reference laptop, averaged over the original scenarios. These are not Rust measurements; router CPU use remains unmeasured.}
 \end{table}
+
+\subsection{Rust runtime efficiency and stability update}\label{sec:rust-runtime}
+The production runtime now defaults to Rust: flow extraction, model inference, the controller, shield and enforcer, capacity probes, reclassification, verification and rollback, intent API, metrics tools and the independent watchdog. The trained model is unchanged. The namespace testbed remains Go, research tooling remains Python, and the previous Go runtime is retained for comparisons.
+
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrl@{}}
+\toprule
+Measurement & Go & Rust & Change \\
+\midrule
+Model inference ($\mu$s) & 9.34 & 6.43 & 31\% less time \\
+Features, inference and decision ($\mu$s) & 11.02 & 6.50 & 41\% less time \\
+Classifier request latency, median ($\mu$s) & 39.98 & 19.26 & 52\% lower \\
+Classifier resident memory (MiB) & 11.57 & 5.45 & 53\% lower \\
+Controller CPU per short run (CPU-seconds) & 0.695 & 0.395 & 43\% lower \\
+Offline extraction of 50,000 flows (ms) & 326 & 244 & $1.34\times$ faster \\
+\bottomrule
+\end{tabularx}
+\caption{Separate Go--Rust host benchmarks. Values are medians; improvements do not combine into an overall network speedup. The extraction measurement used an earlier Rust migration build.}
+\end{table}
+
+\paragraph{Method and scope} Classifier tests used the same model and 2,000-record corpus over seven repetitions, with each service pinned to one CPU. Request latency was measured on a warmed persistent local socket; memory is a post-request resident-set snapshot, not a peak. Extraction used seven alternating trials on 400,000 packets, with identical feature output verified before timing; it measured initial-flow features only. Controller CPU came from three paired short O2 runs with the Rust classifier held fixed and excludes child \texttt{tc}/\texttt{nft} processes. The first Go trial overlapped the end of a regression suite; the reported Go median came from a later trial. These compare implementations with different data layouts and allocation choices, not programming language alone.
+
+\paragraph{Six-hour stability} Scenario S903, O2, seed 23 ran for 21,600 measured seconds plus warm-up, with 30\,Hz gaming traffic, a two-connection bulk download, five new short flows per second and repeated link-capacity changes. It passed with 53,251 label applications and 2,039 shaper-rate changes. There were no enforcement errors, read-back mismatches, classifier timeouts, capture overflows, service replacements or watchdog recoveries. Controller RSS peaked at 6.12\,MiB; the median of its final sampling window was 4.93\,MiB. The run exited successfully and removed the testbed. An earlier attempt stopped after about 31 minutes at the disk-space guard; that attempt is not counted as a six-hour pass. The exporter was not exercised in the soak.
+
+\paragraph{What this changes in the report} These results establish lower implementation overhead in the measured workloads and successful operation for six hours. They do not replace the original 3.6\% scenario-average controller CPU figure, the 0.13\,s connection-labelling time, or any call, game, throughput or accuracy result. In particular, the report's existing \emph{about six microseconds} inference claim is not improved by comparing it with 6.43\,$\mu$s; the measured speedup uses the matched 9.34\,$\mu$s Go baseline. The original scenarios and seeds must be rerun with Rust before those tables can be updated. Saturation performance, OpenWrt cross-compilation, physical-router measurements and proof of leak freedom remain outside this evidence.
+
+\paragraph{Evidence} Raw trials, methods and binary hashes are recorded in the local repository artifacts below. The rebuilt classifier and controller binaries match their benchmark hashes; the final extractor still needs a fresh benchmark.
+\begin{quote}\small
+\path{reports/rust-optimization.json}\\
+\path{reports/rust-runtime-controller-comparison/comparison.json}\\
+\path{reports/rust-runtime-benchmark.json}\\
+\path{reports/rust-six-hour-validation.json}\\
+\path{reports/rust-resume-build-verification.json}
+\end{quote}
 
 %======================================================================
 \section{From prototype to product}\label{sec:product}
 \paragraph{Security and privacy} AQoSE reads packet headers only, never payload, and never decrypts. Flow and device identifiers are keyed hashes; addresses never leave the controller, and the action log holds only hashed ids. Nothing in the system needs a credential, and the repository holds none (its full history was scanned before it was made public; API tokens and cookies are excluded by \texttt{.gitignore}). The lease API has no authentication or access control in the prototype. It is off unless the controller is started with \texttt{-intent <address>}; in the testbed it listens only on the router's loopback address, 127.0.0.1. The code does not itself restrict the address to loopback, so in this form the API must not be reachable from a home network or any network beyond the controlled test environment. Before any such deployment it needs authentication and access control: the router's own administrator login over HTTPS, rate limits on the API, and a signed model file: today the model's version and the hashes of its dataset and damage table are recorded, but the file is not signed. In the testbed everything runs without root in a user namespace; on a router the controller needs network-administration capability for tc, nftables and conntrack, and nothing more.
 
-\paragraph{Performance} On the laptop the controller uses 3.6\% of one core and the classifier 0.04\%. A router's cores are several times slower, so we expect several times these figures; measuring them is the first next step. At high line rates on small routers, CAKE's own cost is likely to be the first limit, not AQoSE's.
+\paragraph{Performance} The historical Go study measured 3.6\% of one laptop core for the controller and 0.04\% for the classifier. The Rust benchmarks in Section~\ref{sec:rust-runtime} establish lower component overhead, but do not provide replacement scenario averages or router CPU figures. Router measurements and saturation tests remain necessary to locate the limiting component at high line rates.
 
-\paragraph{Hardware} OpenWrt routers already ship CAKE, nftables, the \texttt{ctinfo} action and IFB devices; the Go programs cross-compile to their processors as single files, and the model is a 2\,MB file of trees. Hardware or software flow offloading must be off, since offloaded packets bypass the queue that CAKE manages. ISP-supplied routers with closed firmware would need the vendor's integration.
+\paragraph{Hardware} Deployment requires CAKE, nftables, the \texttt{ctinfo} action and IFB devices. The production programs are now Rust, and the model is a 2\,MB file of trees. Selecting an OpenWrt target, cross-compiling with its toolchain and validating the required kernel facilities on the device remain outstanding. Hardware or software flow offloading must be off, since offloaded packets bypass the queue that CAKE manages. ISP-supplied routers with closed firmware would need the vendor's integration.
 
 \paragraph{Operations} Models are versioned directories, and every run records the model, damage table and code version it used, so a model update can be rolled out to a few routers first, compared on tin delay and rollback counts, and rolled back. The watchdog is the kill switch. Telemetry, if any, should be opt-in and aggregate (counts of decisions and tin delays, no addresses). Thresholds, bounds and the damage table are configuration files, not code.
 
@@ -661,7 +696,7 @@ cake-autorate, for comparison & 1.2 (0.8--1.6) \\
 \item \textbf{Voice tin share.} A cloud game above a quarter of the line loses priority in Voice (one fresh seed of S7).
 \item \textbf{VPN traffic is out of scope.} A VPN carries all of a device's connections inside one encrypted tunnel, so no classifier on the router, AQoSE included, can tell a call from a backup inside it. We did not test VPN traffic. Tunnels over UDP, which most modern VPNs use, are never demoted and so get plain CAKE; tunnels over TCP must be excluded from demotion before any deployment.
 \item \textbf{Probe targets returning.} In S10, when the delay reflectors came back after an outage, the estimator read their return as a queue and halved the download rate for about 30\,s; the download lost 10\% of its throughput, the call nothing. A fix is needed.
-\item \textbf{Not measured:} a flood of short flows, gigabit rates, router CPU and memory.
+\item \textbf{Not measured:} saturation under a flood of short flows, gigabit rates, router CPU and memory. The Rust soak exercised five new short flows per second for six hours; it did not establish maximum capacity.
 \item \textbf{Leases} take effect at the flow's next window, up to 5\,s, not the 1\,s target.
 \end{itemize}
 
@@ -693,9 +728,11 @@ The system is built to fail safe: every change passes a fuzz-tested shield, is r
 \newpagenext
 {\sloppy The code, scenarios, the two replay traces, the trained models and the reports are public at \href{https://github.com/shreyashsri79/aqose}{\texttt{github.com/shreyashsri79/aqose}}. Raw run directories are not in the repository because of their size; the commands below regenerate them. The datasets are not in it either. The public sources are downloaded by \texttt{scripts/fetch-data.sh} (some sites serve only a registered browser session), but our own captures (three JioGamesCloud sessions and six WhatsApp calls) are not published, so dataset v2 and the sealed test set cannot be rebuilt exactly from the repository alone; the trained model built from them is in it. Commands run from the repository root; the Python package is not installed, so Python modules need \texttt{PYTHONPATH=ml}.\par}
 \begin{verbatim}
-make venv && make build && make check   # environment, binaries, unit tests
+make venv && make build && make check   # Rust runtime, Go testbed, tests
 make testbed-check                      # tests against the real testbed
-make fuzz                               # the safety shield, 5 minutes
+make build-go-reference                 # historical Go runtime in bin/go
+make fuzz-go-reference FUZZTIME=300s     # historical shield fuzzer
+export AQOS_RUNTIME=go AQOS_SERVICE=go   # historical study implementation
 export PYTHONPATH=ml
 PY=.venv/bin/python
 $PY -m aqos_ml.run matrix configs/matrix-core.yaml --results results-core
@@ -703,7 +740,7 @@ $PY -m aqos_ml.run matrix configs/matrix-aa.yaml --results results-aa
 scripts/final-runs.sh   # after the two above: every run after the freeze
 $PY -m aqos_ml.run matrix configs/matrix-realcall.yaml \
     --results results-realcall                    # replayed real calls
-AQOS_MODEL=lgbm-v1-fe91bbad $PY -m aqos_ml.run matrix \
+AQOS_SERVICE=python AQOS_MODEL=lgbm-v1-fe91bbad $PY -m aqos_ml.run matrix \
     configs/matrix-realcall-v1.yaml --results results-realcall-v1
 $PY -m aqos_ml.run matrix configs/matrix-ipv6.yaml --results results-ipv6
 $PY -m aqos_ml.compare --dataset data/dataset/v2.jsonl.gz --final
@@ -712,6 +749,25 @@ $PY -m aqos_ml.evidence                 # fairness, loss, estimator, dashboard
 reports/paper/diagrams/render.sh        # the flowcharts in this report
 scripts/demo.sh                         # the scripted demo, about 8 minutes
 \end{verbatim}
+\subsection*{Reproducing the Rust runtime update}
+The historical commands above explicitly select Go. Rust is the current default;
+use fresh output paths for new runs so historical results cannot be mistaken for
+Rust measurements. The following commands regenerate the component comparisons
+and a six-hour host soak; they do not rerun the original research matrix.
+\begin{verbatim}
+unset AQOS_RUNTIME AQOS_SERVICE
+make build build-go-reference
+.venv/bin/python scripts/bench-rust.py \
+    --out reports/rust-classifier-new.json
+.venv/bin/python scripts/bench-runtime.py \
+    --out reports/rust-extraction-new.json
+.venv/bin/python scripts/bench-runtime-controller.py \
+    --trials 3 --results reports/rust-controller-new
+make soak-runtime SOAK_RESULTS=results-rust-soak-new
+\end{verbatim}
+Keep the host awake during the soak. Its disk guard stops the run if less than
+1\,GiB remains free. A stopped or interrupted attempt is not a passing result.
+
 \subsection*{Scripted demo}
 \texttt{scripts/demo.sh} runs the whole loop in about eight minutes, without root: it resets the testbed and builds the binaries; introduces the condition by running S6 (a call, then file sharing on the same laptop at 30\,s) with plain CAKE and then with AQoSE on the same seed; collects the evidence each run writes (per-packet metrics, CAKE tin statistics, every decision with its reason, the verifier's verdicts, CPU per component); and reports a side-by-side table and a second-by-second chart. \texttt{aqos\_ml.evidence} computes the fairness, jitter, loss, link-estimation and dashboard figures in this report from finished runs.
 
@@ -724,6 +780,7 @@ Linux kernel & 7.2.8 (any 7.2.x) & LightGBM & 4.7.0 \\
 iproute2 (\texttt{tc}, \texttt{ip}) & 6.14.0 & scikit-learn & 1.9.1 \\
 nftables & 1.1.3 & NumPy, pandas & 2.5.3, 3.0.6 \\
 Go & 1.26.8 & matplotlib & 3.11.2 \\
+Rust & 1.99.1 & Cargo & 1.99.1 \\
 \texttt{gopkg.in/yaml.v3} & 3.0.1 & PyYAML, jsonschema, pytest & 6.0.3, 4.26.0, 9.1.1 \\
 \bottomrule
 \end{tabular}
@@ -732,8 +789,8 @@ Go & 1.26.8 & matplotlib & 3.11.2 \\
 \begin{verbatim}
 make venv     # .venv from requirements.lock
 make env      # compares this machine with VERSIONS.md
-make build    # Go binaries into bin/
-make check    # Go and Python tests, about a minute
+make build    # Rust runtime and Go testbed into bin/
+make check    # Rust, Go reference and Python tests
 \end{verbatim}
 
 \subsection*{Third-party data and software}

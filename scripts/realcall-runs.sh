@@ -24,7 +24,7 @@ status "testing"
 status "real calls, frozen system"
 .venv/bin/python -u -m aqos_ml.run matrix configs/matrix-realcall.yaml --results results-realcall || stop "matrix-realcall"
 status "real calls, model that never saw WhatsApp"
-AQOS_MODEL=lgbm-v1-fe91bbad .venv/bin/python -u -m aqos_ml.run matrix configs/matrix-realcall-v1.yaml \
+AQOS_SERVICE=python AQOS_MODEL=lgbm-v1-fe91bbad .venv/bin/python -u -m aqos_ml.run matrix configs/matrix-realcall-v1.yaml \
     --results results-realcall-v1 || stop "matrix-realcall-v1"
 status "reports"
 .venv/bin/python -m aqos_ml.report --results results-realcall --out reports/realcall.md || status "report failed; the runs are in results-realcall"
