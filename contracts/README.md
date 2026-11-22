@@ -2,7 +2,7 @@
 
 These are the formats that cross the boundary between Systems and ML. Both sides build against them, so a change here needs both people to agree.
 
-The JSON Schemas in `schema/` are the source of truth. This page explains what the schemas cannot say. `make check` validates every file in `examples/` against its schema in Python, and checks Rust production types and the Go reference types in `contracts.go`. The Rust runtime rejects missing required nullable fields as well as unknown fields. Scenario files are read in Go with `contracts.LoadScenario`, which rejects unknown fields.
+The JSON Schemas in `schema/` are the source of truth. This page explains what the schemas cannot say. `make check` validates every file in `examples/` against its schema in Python, and checks the Go runtime types in `contracts.go`. Optional `make test-rust test-runtime` checks the retained Rust implementation. The Rust runtime rejects missing required nullable fields as well as unknown fields. Scenario files are read in Go with `contracts.LoadScenario`, which rejects unknown fields.
 
 | Contract | Schema | From | To |
 | --- | --- | --- | --- |

@@ -103,7 +103,7 @@ def test_valid_runs_are_skipped_and_invalid_ones_retried_once(tmp_path, monkeypa
         calls.append((config, seed, attempt))
         run = runner._Run(scenario, config, seed, attempt, tag, results)
         run.out.mkdir(parents=True, exist_ok=True)
-        (run.out / "environment.json").write_text(json.dumps({"runtime": "rust"}))
+        (run.out / "environment.json").write_text(json.dumps({"runtime": "go"}))
         # Seed 2 fails its first attempt; seed 3 always fails.
         problems = ["generator died"] if (seed == 2 and attempt == 1) or seed == 3 else []
         return run.manifest("2026-10-12T10:15:00+05:30", problems)
@@ -182,15 +182,15 @@ def test_table_puts_configurations_side_by_side(tmp_path):
     assert "| *all entries* | **summed cost** | **0.00** | **1.67** |" in text
 
 
-def test_classifier_configurations_default_to_rust(monkeypatch):
+def test_classifier_configurations_default_to_go(monkeypatch):
     from aqos_ml.run import runner
     monkeypatch.delenv("AQOS_SERVICE", raising=False)
     monkeypatch.delenv("AQOS_SERVE_ARGS", raising=False)
     version = (runner.MODELS / "chosen-v2.txt").read_text().strip()
-    if not (runner.MODELS / version / "trees.json").exists() or not runner.CLASSIFY_RUST.exists():
+    if not (runner.MODELS / version / "trees.json").exists() or not runner.CLASSIFY.exists():
         pytest.skip("trees.json or bin/aqos-classify missing: python -m aqos_ml.export; make build")
     o1 = runner.service_command("O1", "s.sock", ["--model", version, "--mode", "top_label"], version)
-    assert o1[0] == runner.CLASSIFY_RUST and o1[o1.index("-mode") + 1] == "top_label"
+    assert o1[0] == runner.CLASSIFY and o1[o1.index("-mode") + 1] == "top_label"
     rules = runner.service_command("B4", "s.sock", ["--rules"], "qosify-rules-v1")
     assert "aqos_ml.serve" in rules
     monkeypatch.setenv("AQOS_SERVE_ARGS", "--feature-noise 1.0")
@@ -200,8 +200,20 @@ def test_classifier_configurations_default_to_rust(monkeypatch):
     assert "aqos_ml.serve" in runner.service_command("O2", "s.sock", ["--model", version], version)
 
 
+def test_go_is_default_for_router_processes_and_run_metadata(monkeypatch, tmp_path):
+    monkeypatch.delenv("AQOS_RUNTIME", raising=False)
+    monkeypatch.delenv("AQOS_SERVICE", raising=False)
+    monkeypatch.delenv("AQOS_SERVE_ARGS", raising=False)
+    # A leftover Rust build override must not affect the default runtime.
+    monkeypatch.setenv("AQOS_RUNTIME_DIR", str(tmp_path))
+    for binary in [runner.AQOSD, runner.EXTRACT, runner.CTL, runner.CAKE_READER,
+                   runner.REFLECTOR, runner.WATCHDOG]:
+        assert runner.runtime_binary(binary) == REPO / "bin/go" / binary.name
+    assert runner.runtime_binary(runner.TESTBED) == runner.TESTBED
+
+
 def test_rust_runtime_selects_all_router_processes_but_keeps_testbed(monkeypatch, tmp_path):
-    monkeypatch.delenv("AQOS_RUNTIME", raising=False)  # Rust must be the default.
+    monkeypatch.setenv("AQOS_RUNTIME", "rust")
     monkeypatch.setenv("AQOS_RUNTIME_DIR", str(tmp_path))
     for binary in [runner.AQOSD, runner.EXTRACT, runner.CTL, runner.CAKE_READER,
                    runner.REFLECTOR, runner.WATCHDOG]:
@@ -214,13 +226,17 @@ def test_rust_runtime_selects_all_router_processes_but_keeps_testbed(monkeypatch
         runner.runtime_binary(runner.AQOSD)
 
 
-def test_rust_runtime_cannot_reuse_cached_go_run(monkeypatch, tmp_path):
+@pytest.mark.parametrize("requested,previous", [("rust", "go"), (None, "rust")])
+def test_runtime_cannot_reuse_cached_other_backend(monkeypatch, tmp_path, requested, previous):
     run_id = "S901-O2-s0007"
     directory = tmp_path / run_id
     directory.mkdir()
     (directory / "manifest.json").write_text(json.dumps({"run_id": run_id, "valid": True}))
-    (directory / "environment.json").write_text(json.dumps({"runtime": "go", "service": "rust"}))
-    monkeypatch.setenv("AQOS_RUNTIME", "rust")
+    (directory / "environment.json").write_text(json.dumps({"runtime": previous, "service": "rust"}))
+    if requested is None:
+        monkeypatch.delenv("AQOS_RUNTIME", raising=False)
+    else:
+        monkeypatch.setenv("AQOS_RUNTIME", requested)
     with pytest.raises(runner.RunError, match="different runtime backend"):
         runner.run_until_valid("ml/tests/scenarios/s1_short.yaml", "O2", 7, results=tmp_path)
 
@@ -229,11 +245,11 @@ def test_missing_default_classifier_is_refused_before_touching_testbed(monkeypat
     monkeypatch.delenv("AQOS_RUNTIME", raising=False)
     monkeypatch.delenv("AQOS_SERVICE", raising=False)
     monkeypatch.delenv("AQOS_SERVE_ARGS", raising=False)
-    monkeypatch.setattr(runner, "CLASSIFY_RUST", tmp_path / "absent")
+    monkeypatch.setattr(runner, "CLASSIFY", tmp_path / "absent")
     def unexpected(*args, **kwargs):
         pytest.fail("service preflight must precede testbed ownership or network changes")
     monkeypatch.setattr(runner, "claim_testbed", unexpected)
     monkeypatch.setattr(runner, "_testbed", unexpected)
-    with pytest.raises(runner.RunError, match="Rust classifier"):
+    with pytest.raises(runner.RunError, match="Go classifier"):
         runner.run_one("ml/tests/scenarios/s1_short.yaml", "O2", 7, results=tmp_path / "runs")
     assert not (tmp_path / "runs").exists()

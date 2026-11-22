@@ -97,7 +97,7 @@ class RunError(Exception):
 
 def runtime_binary(binary):
     """Select all router runtime processes together; keep the Go testbed."""
-    backend = os.environ.get("AQOS_RUNTIME", "rust")
+    backend = os.environ.get("AQOS_RUNTIME", "go")
     if backend not in ("go", "rust"):
         raise RunError(f"unknown AQOS_RUNTIME backend: {backend}")
     runtime = {str(p): p for p in (CAKE_READER, CTL, EXTRACT, REFLECTOR, AQOSD, WATCHDOG)}
@@ -203,12 +203,12 @@ def _cpu_seconds(pid):
 
 
 def service_command(config, socket_path, args, version):
-    """Rust is the default classifier. Python remains the B4 rules reference;
-    Go/Python model services require explicit selection for comparisons.
-    Missing Rust artifacts or unsupported flags fail without a fallback."""
+    """Go is the default classifier. Python remains the B4 rules reference;
+    Rust/Python model services require explicit selection for comparisons.
+    Missing native artifacts or unsupported flags fail without a fallback."""
     python = [sys.executable, "-m", "aqos_ml.serve", "--socket", socket_path, *args]
     trees = MODELS / str(version) / "trees.json"
-    backend = os.environ.get("AQOS_SERVICE", "rust")
+    backend = os.environ.get("AQOS_SERVICE", "go")
     if backend not in {"go", "python", "rust"}:
         raise RunError(f"unknown AQOS_SERVICE backend: {backend}")
     if "--rules" in args or backend == "python":
@@ -217,7 +217,7 @@ def service_command(config, socket_path, args, version):
         raise RunError(f"AQOS_SERVE_ARGS is not supported by the {backend.title()} backend; select AQOS_SERVICE=python")
     binary = CLASSIFY_RUST if backend == "rust" else CLASSIFY
     if not binary.exists() or not trees.exists():
-        target = "build-rust" if backend == "rust" else "build-go-reference"
+        target = "build-rust" if backend == "rust" else "build"
         raise RunError(f"{backend.title()} classifier or exported model missing; run make {target}")
     mode = args[args.index("--mode") + 1] if "--mode" in args else "expected_damage"
     return [binary, "-socket", socket_path, "-model", trees, "-mode", mode,
@@ -441,9 +441,9 @@ class _Run:
             "reclassifier": os.environ.get("AQOS_RECLASSIFIER", "1") != "0",
             "aqosd_args": os.environ.get("AQOSD_ARGS", ""),
             "serve_args": os.environ.get("AQOS_SERVE_ARGS", ""),
-            "service": ("python" if self.config == "B4" else os.environ.get("AQOS_SERVICE", "rust"))
+            "service": ("python" if self.config == "B4" else os.environ.get("AQOS_SERVICE", "go"))
                        if CONFIGS[self.config].get("service") else "none",
-            "runtime": os.environ.get("AQOS_RUNTIME", "rust"),
+            "runtime": os.environ.get("AQOS_RUNTIME", "go"),
         }, indent=2) + "\n")
         self.log(_testbed("exec", "router", "--", REPO / CONFIGS[self.config]["script"],
                           link["down_kbit"], link["up_kbit"]).strip())
@@ -628,7 +628,7 @@ def run_one(scenario, config, seed, attempt=1, tag=None, results=RESULTS, extrac
     for binary in (TESTBED, CAKE_READER, EXTRACT, CTL, AQOSD, REFLECTOR, WATCHDOG):
         binary = Path(runtime_binary(binary))
         if not binary.exists():
-            target = "build" if binary == TESTBED or os.environ.get("AQOS_RUNTIME", "rust") == "rust" else "build-go-reference"
+            target = "build-runtime" if binary != TESTBED and os.environ.get("AQOS_RUNTIME", "go") == "rust" else "build"
             raise RunError(f"{binary} is missing: run `make {target}`")
     if extract and CONFIGS[config].get("service"):
         raise RunError("the stand-alone extractor and the controller cannot run together: both own the nflog rule")
@@ -690,7 +690,7 @@ def run_until_valid(scenario, config, seed, tag=None, results=RESULTS, report=pr
     path = find_scenario(scenario)
     scenario_id = yaml.safe_load(path.read_text())["id"]
     made = attempts(scenario_id, config, seed, results)
-    requested_runtime = os.environ.get("AQOS_RUNTIME", "rust")
+    requested_runtime = os.environ.get("AQOS_RUNTIME", "go")
     if requested_runtime not in ("go", "rust"):
         raise RunError(f"unknown AQOS_RUNTIME backend: {requested_runtime}")
     for manifest in made:
@@ -701,7 +701,7 @@ def run_until_valid(scenario, config, seed, tag=None, results=RESULTS, report=pr
     # A Rust trial must never silently reuse a Go result (or vice versa).
     # Older results have no environment file and are not evidence of Rust use.
     if CONFIGS[config].get("service") and config != "B4":
-        requested = os.environ.get("AQOS_SERVICE", "rust")
+        requested = os.environ.get("AQOS_SERVICE", "go")
         for manifest in made:
             environment = Path(results) / manifest["run_id"] / "environment.json"
             prior = json.loads(environment.read_text()).get("service", "go") if environment.exists() else "go"

@@ -55,7 +55,20 @@ def test_resource_summary_detects_pid_reuse(tmp_path):
     assert result["fd_peak"] == 9
 
 
-def test_low_disk_refuses_before_launch(tmp_path, monkeypatch):
+@pytest.fixture
+def runtime_files(tmp_path, monkeypatch):
+    """Hash fixtures without requiring a build of the optional Rust runtime."""
+    root = tmp_path / "repo"
+    (root / "bin").mkdir(parents=True)
+    for name in soak.RUNTIMES:
+        (root / "bin" / name).write_bytes(b"runtime fixture")
+    scenario = root / "ml/tests/scenarios/s1_short.yaml"
+    scenario.parent.mkdir(parents=True)
+    scenario.write_bytes((REPO / "ml/tests/scenarios/s1_short.yaml").read_bytes())
+    monkeypatch.setattr(soak, "REPO", root)
+
+
+def test_low_disk_refuses_before_launch(tmp_path, monkeypatch, runtime_files):
     from collections import namedtuple
     Usage = namedtuple("Usage", "total used free")
     monkeypatch.setattr(soak.shutil, "disk_usage", lambda path: Usage(100, 100, 0))
@@ -91,7 +104,7 @@ def test_process_sampling_follows_wrappers_but_excludes_other_runs(tmp_path):
     assert rows[0]["fds"] == 1
 
 
-def test_spawn_failure_is_saved_as_failure(tmp_path, monkeypatch):
+def test_spawn_failure_is_saved_as_failure(tmp_path, monkeypatch, runtime_files):
     def fail(*args, **kwargs):
         raise OSError("injected process launch failure")
     monkeypatch.setattr(soak.subprocess, "Popen", fail)

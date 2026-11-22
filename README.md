@@ -13,7 +13,7 @@
 <p align="center">
   <a href="reports/paper/aqose-report.pdf"><img alt="Full report" src="https://img.shields.io/badge/report-PDF-1C3F86?style=for-the-badge"></a>
   <a href="https://youtu.be/k6ccbBaxwUg"><img alt="Explainer video" src="https://img.shields.io/badge/video-YouTube-C8452B?style=for-the-badge"></a>
-  <img alt="Rust 1.99" src="https://img.shields.io/badge/Rust-1.99-CE422B?style=for-the-badge&logo=rust&logoColor=white">
+  <img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=for-the-badge&logo=go&logoColor=white">
   <img alt="Python 3.14" src="https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge&logo=python&logoColor=white">
   <img alt="LightGBM" src="https://img.shields.io/badge/LightGBM-4.7-6A4FD0?style=for-the-badge">
   <img alt="Linux CAKE" src="https://img.shields.io/badge/Linux-CAKE-1D8A5A?style=for-the-badge&logo=linux&logoColor=white">
@@ -84,7 +84,7 @@ Median late video or game frames over 10 seeds, frozen system:
 
 <p align="center"><img src="docs/images/how-the-model-works-minimal.png" alt="28 flow features go into 259 decision trees, which output calibrated probabilities for 7 classes" width="85%"></p>
 
-**The classifier** is LightGBM: 37 boosting rounds for each of 7 classes, 259 trees, calibrated with temperature scaling. It reads 28 numbers: 8 packet sizes signed by direction, the 7 gaps between them, IP version, protocol, the port *class* of each end (never raw port numbers) and 9 window statistics. The trees are exported as data and run in Rust; the measured inference median is about 6.4 µs on the reference laptop. It was trained on 246,274 records from seven sources, split by capture session, never by record.
+**The classifier** is LightGBM: 37 boosting rounds for each of 7 classes, 259 trees, calibrated with temperature scaling. It reads 28 numbers: 8 packet sizes signed by direction, the 7 gaps between them, IP version, protocol, the port *class* of each end (never raw port numbers) and 9 window statistics. The trees are exported as data and run in Go by default; the historical Rust model-only benchmark median is about 6.4 µs on the reference laptop. This excludes socket transport and is not the latency of every live classification. It was trained on 246,274 records from seven sources, split by capture session, never by record.
 
 <table>
 <tr>
@@ -146,34 +146,36 @@ Every change, from any part of the system, passes the same checks:
 
 ## <img src="docs/images/kid-architecture.png" width="44" align="top"> Quick start
 
-Linux with CAKE, nftables and user namespaces; Rust 1.99, Go 1.26 for the
-experiment testbed, and Python 3.14 for research tooling. Versions are pinned in [VERSIONS.md](VERSIONS.md).
+Linux with CAKE, nftables and user namespaces; Go 1.26 for the runtime and
+experiment testbed, and Python 3.14 for research tooling. Rust 1.99 is optional. Versions are pinned in [VERSIONS.md](VERSIONS.md).
 
 ```bash
 make venv    # create .venv from requirements.lock
 make env     # compare this machine against VERSIONS.md
-make check   # Rust format/clippy/tests, Go reference checks, Python and parity tests
-make build   # Rust runtime commands and the Go testbed into bin/
+make check   # Go formatting, vet and tests; Python and contract tests
+make build   # Go runtime commands and testbed into bin/
 
 scripts/demo.sh   # the whole loop in ~8 minutes, no sudo: S6 with plain CAKE, then with AQoSE, side by side
 ```
 
-Rust is now the default for the complete router runtime and classifier.
+Go is the default for the complete router runtime and classifier. Rust sources
+and migration validation artifacts remain available. Rust measurements below
+apply to the optional Rust implementation.
 `make build` installs the familiar `bin/aqosd`, `bin/aqos-classify`,
 `bin/aqos-extract`, `bin/aqos-ctl`, `bin/aqos-cake-reader`, `bin/aqos-reflector`,
-`bin/aqos-watchdog`, and `bin/aqos-exporter` command names as Rust aliases.
-The `-rs` names remain available. The model and Unix-socket contracts are preserved.
-Its model loader validates class coverage, child bounds, cycles and calibration
+`bin/aqos-watchdog`, and `bin/aqos-exporter` command names as aliases to `bin/go/`.
+The optional Rust `-rs` names remain available after an explicit Rust build.
+The model and Unix-socket contracts are preserved. The Rust model loader validates class coverage, child bounds, cycles and calibration
 before constructing an inference-ready model. Probability distributions and
 validated records have separate types; the crate forbids unsafe Rust.
 
 ```bash
 # Requires Rust/Cargo (tested with 1.99.1); Cargo.lock pins dependencies.
-make build-rust
+make build build-rust build-runtime
 make test-rust      # Rust checks and differential Go/Rust socket tests
 make bench-rust     # paired core + service benchmarks, raw JSON in reports/
 
-PYTHONPATH=ml .venv/bin/python -m aqos_ml.run one \
+PYTHONPATH=ml AQOS_RUNTIME=rust AQOS_SERVICE=rust .venv/bin/python -m aqos_ml.run one \
   --scenario S6 --config O2 --seed 7 --results results-rust
 ```
 
@@ -181,68 +183,74 @@ The Rust runtime includes flow extraction, the shield and enforcer, capacity
 probing, reclassification, verification and rollback, the intent API, CAKE
 metrics, the reflector, the Prometheus exporter, and an independent watchdog.
 The watchdog has its own crate and does not depend on the controller or model.
+
+The Go intent API is unauthenticated and should remain on loopback.
 Python training/reporting/traffic generation and the Go namespace testbed remain.
 
 ```bash
 make build
 make test-runtime           # format, clippy, Rust tests, Go/Rust feature parity
-make testbed-check          # full integration suite using the default Rust commands
-make fuzz FUZZTIME=150s     # seeded Rust generative stress, not coverage-guided fuzzing
+make testbed-check          # integration suite using the default Go commands
+make runtime-testbed-check  # optional Rust integration suite
+make fuzz FUZZTIME=150s     # Go shield fuzzing
+make fuzz-runtime FUZZTIME=150s  # optional Rust generative stress
 
 PYTHONPATH=ml .venv/bin/python -m aqos_ml.run one \
-  --scenario S6 --config O2 --seed 7 --results results-rust-runtime
+  --scenario S6 --config O2 --seed 7 --results results-go-runtime
 
 # Dashboard exporter is selected directly; the runner does not launch it.
-bin/aqos-exporter -file results-rust-runtime/current/metrics.jsonl -listen :9108
+bin/aqos-exporter -file results-go-runtime/current/metrics.jsonl -listen :9108
 
-.venv/bin/python scripts/bench-runtime.py
+make bench-runtime         # optional Go/Rust comparison
 # Paired live CPU benchmark; requires a fresh output directory and owns the testbed:
+make build-rust
 .venv/bin/python scripts/bench-runtime-controller.py --trials 3 \
   --results reports/rust-runtime-controller-comparison-new
 ```
 
-The runner defaults to `AQOS_RUNTIME=rust` and `AQOS_SERVICE=rust`; neither
+The runner defaults to `AQOS_RUNTIME=go` and `AQOS_SERVICE=go`; neither
 variable is needed for normal runs. `AQOS_RUNTIME_DIR` can select another
 Rust build. Missing binaries fail before the testbed is touched. Dataset builds
-also use the canonical Rust extractor.
+also use the canonical Go extractor. `make build` restores all canonical commands
+to Go even when older Rust aliases are present.
 
-Go runtime sources are retained as comparison references, separately built:
+A normal Go run needs no backend overrides:
 
 ```bash
-make build-go-reference  # bin/go/*; never replaces a Rust command
-PYTHONPATH=ml AQOS_RUNTIME=go AQOS_SERVICE=go .venv/bin/python -m aqos_ml.run one \
+make build  # bin/go/* with canonical command aliases in bin/
+PYTHONPATH=ml .venv/bin/python -m aqos_ml.run one \
   --scenario S6 --config O2 --seed 7 --results results-go-reference
 ```
 
 Historical results without backend metadata are treated as Go. Use a fresh
-results directory for Rust runs; cached results from another backend are refused.
+results directory when switching backends; cached results from another backend are refused.
 B4 remains the Python rules reference. Feature-noise research experiments use
-`AQOS_SERVICE=python AQOS_SERVE_ARGS="--feature-noise 1.0"` explicitly; production
-Rust selection never silently falls back to another implementation.
+`AQOS_SERVICE=python AQOS_SERVE_ARGS="--feature-noise 1.0"` explicitly; native
+backend selection never silently falls back to another implementation.
 
-To stage the eight production commands for deployment without the Go testbed:
+To stage the eight Go runtime commands without the development testbed:
 
 ```bash
 make install-runtime DESTDIR=/tmp/aqos-package PREFIX=/usr
 ```
 
-The [staged-install check](reports/rust-full-migration-install.json) verifies all
-eight commands and processes a flow through the installed extractor/classifier.
+The retained [staged-install check](reports/rust-full-migration-install.json)
+records the earlier Rust installation and extractor/classifier smoke test.
 This target produces `/tmp/aqos-package/usr/bin/aqos*`. The router processes need Linux
-networking facilities and `ip`, `tc`, and `nft`; they need neither Go nor Python.
+networking facilities and `ip`, `tc`, and `nft`; they do not need the Go compiler or Python.
 Supply the existing model, damage-table and shield-config paths when launching
 the classifier/controller. This staging target builds for the host architecture;
 OpenWrt target compilation and on-device validation remain separate work.
 
 The [full migration validation](reports/rust-full-migration-validation.json)
-records the default build, staged installation, 23 integration tests, and
+records the earlier Rust default build, staged installation, 23 integration tests, and
 5.95 million seeded Rust stress cases. Twenty forced kill/stop trials restored
 verified safe forwarding in 2.05–2.11 seconds. A combined capacity/intent test
 lowered the shaper from 95 Mbit/s to about 18 Mbit/s after the link dropped to
 20 Mbit/s, with no enforcement errors or capture overflows. Raw artifacts are
 kept in [the capacity/intent run](reports/rust-full-migration-capacity-intent/).
 
-The [default-build checks](reports/rust-full-migration-checks.txt) and
+The historical [Rust default-build checks](reports/rust-full-migration-checks.txt) and
 [runtime checks](reports/rust-runtime-tests.txt) cover counter resets,
 malformed packets, shield bounds, classifier deadlines and stale replies,
 capacity recovery, reclassification sequences, leases, and metrics rotation.

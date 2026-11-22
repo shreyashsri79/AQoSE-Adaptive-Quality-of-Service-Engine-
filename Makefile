@@ -1,7 +1,7 @@
 .PHONY: check env venv build test-go test-py testbed-check fuzz
 .DEFAULT_GOAL := check
 
-# Rust is the production runtime. Go runtime binaries are comparison references only.
+# Go is the default runtime. Rust builds and comparisons remain opt-in.
 PREFIX ?= /usr/local
 DESTDIR ?=
 CARGO ?= $(HOME)/.cargo/bin/cargo
@@ -14,13 +14,13 @@ build-rust:
 	cp rust/aqos-classify/target/release/aqos-classify-rs bin/
 	cp rust/aqos-classify/target/release/aqos-core-bench-rs bin/
 
-test-rust: build build-go-reference
+test-rust: build build-rust
 	$(CARGO) fmt --manifest-path $(RUST_MANIFEST) -- --check
 	$(CARGO) clippy --locked --manifest-path $(RUST_MANIFEST) --all-targets -- -D warnings
 	$(CARGO) test --locked --manifest-path $(RUST_MANIFEST)
 	AQOS_RUST_TEST=1 .venv/bin/pytest -q ml/tests/test_rust_backend.py
 
-bench-rust: build build-go-reference
+bench-rust: build build-rust
 	.venv/bin/python scripts/bench-rust.py --out reports/rust-migration.json
 
 RUNTIME_MANIFEST = rust/aqos-runtime/Cargo.toml
@@ -33,10 +33,10 @@ build-runtime:
 	cp rust/aqos-runtime/target/release/aqos-extract-rs rust/aqos-runtime/target/release/aqos-ctl-rs rust/aqos-runtime/target/release/aqosd-rs rust/aqos-runtime/target/release/aqos-cake-reader-rs rust/aqos-runtime/target/release/aqos-reflector-rs rust/aqos-runtime/target/release/aqos-exporter-rs bin/
 	cp rust/aqos-watchdog/target/release/aqos-watchdog-rs bin/
 
-bench-runtime: build build-go-reference
+bench-runtime: build build-runtime
 	.venv/bin/python scripts/bench-runtime.py
 
-test-runtime: build build-go-reference
+test-runtime: build build-runtime
 	$(CARGO) fmt --manifest-path $(RUNTIME_MANIFEST) -- --check
 	$(CARGO) fmt --manifest-path $(WATCHDOG_MANIFEST) -- --check
 	$(CARGO) clippy --locked --manifest-path $(RUNTIME_MANIFEST) --all-targets -- -D warnings
@@ -46,53 +46,58 @@ test-runtime: build build-go-reference
 	$(CARGO) build --locked --manifest-path $(RUNTIME_MANIFEST)
 	AQOS_EXTRACT_BIN=rust/aqos-runtime/target/debug/aqos-extract-rs AQOS_RUNTIME_TEST=1 .venv/bin/pytest -q ml/tests/test_extract.py ml/tests/test_rust_runtime.py
 
-runtime-testbed-check: build build-go-reference
+runtime-testbed-check: build build-rust build-runtime
 	$(CARGO) build --locked --manifest-path $(RUNTIME_MANIFEST)
 	AQOS_RUNTIME_INTEGRATION=1 .venv/bin/pytest -q ml/tests/test_rust_runtime_testbed.py
-	AQOS_INTEGRATION=1 .venv/bin/pytest -q ml/tests/test_controller_testbed.py
+	AQOS_INTEGRATION=1 AQOS_RUNTIME=rust AQOS_SERVICE=rust .venv/bin/pytest -q ml/tests/test_controller_testbed.py
 
-check: test-go test-rust test-runtime test-py
+check: test-go test-py
 
-.PHONY: build-testbed build-go-reference install-runtime
-build: build-testbed build-rust build-runtime
-	@set -e; for name in aqos-classify aqos-core-bench aqos-extract aqos-ctl aqosd aqos-cake-reader aqos-reflector aqos-exporter aqos-watchdog; do ln -sfn "$$name-rs" "bin/$$name"; done
+.PHONY: build-testbed build-go build-go-reference install-runtime
+build: build-go
+	@set -e; for name in aqos-testbed aqos-classify aqos-core-bench aqos-extract aqos-ctl aqosd aqos-cake-reader aqos-reflector aqos-exporter aqos-watchdog; do ln -sfn "go/$$name" "bin/$$name"; done
 
-# Development harness only; the installed runtime does not require Go.
+# Development harness only; the installed runtime does not include the testbed.
 build-testbed:
 	mkdir -p bin
 	go build -o bin/aqos-testbed ./cmd/aqos-testbed
 
-# Never overwrite the Rust command names with a comparison build.
-build-go-reference:
+# Separate output preserves the optional Rust binaries.
+build-go:
 	mkdir -p bin/go
 	go build -o bin/go/ ./cmd/...
 
-# Stage with DESTDIR for packaging; the runtime installation contains no Go tools.
-install-runtime: build-rust build-runtime
+# Compatibility target used by the retained comparison scripts.
+build-go-reference: build-go
+
+# Stage Go runtime commands without the development testbed.
+install-runtime: build-go
 	install -d "$(DESTDIR)$(PREFIX)/bin"
-	@set -e; for name in aqos-classify aqos-extract aqos-ctl aqosd aqos-cake-reader aqos-reflector aqos-exporter aqos-watchdog; do install -m 755 "bin/$$name-rs" "$(DESTDIR)$(PREFIX)/bin/$$name"; done
+	@set -e; for name in aqos-classify aqos-extract aqos-ctl aqosd aqos-cake-reader aqos-reflector aqos-exporter aqos-watchdog; do install -m 755 "bin/go/$$name" "$(DESTDIR)$(PREFIX)/bin/$$name"; done
 
 test-go:
-	gofmt -l . | (! grep .)
-	go vet ./...
-	go test ./...
+	# Saved research sources under reports/ are evidence, not live packages.
+	gofmt -l cmd internal contracts | (! grep .)
+	go vet ./cmd/... ./internal/... ./contracts/...
+	go test ./cmd/... ./internal/... ./contracts/...
 
 test-py: build
 	.venv/bin/pytest -q
 
 # Builds the real testbed and runs traffic through it. Replaces any running
 # testbed and takes a few minutes, so it is not part of `check`.
-testbed-check: build build-go-reference
-	$(CARGO) build --locked --manifest-path $(RUNTIME_MANIFEST)
+testbed-check: build
 	AQOS_INTEGRATION=1 go test -count=1 -run TestTestbed -v ./internal/testbed/
 	AQOS_INTEGRATION=1 .venv/bin/pytest -q -s ml/tests/test_gen_testbed.py ml/tests/test_run_testbed.py \
 		ml/tests/test_extract_testbed.py ml/tests/test_enforce_testbed.py \
-		ml/tests/test_controller_testbed.py ml/tests/test_rust_runtime_testbed.py
+		ml/tests/test_controller_testbed.py
 
-# Reproducible generative stress of the production Rust shield and parsers.
-# This is not coverage-guided; the Go reference fuzzer remains available separately.
+# Go shield fuzzing by default; retain the optional Rust generative stress target.
 FUZZTIME ?= 150s
-fuzz:
+fuzz: fuzz-go-reference
+
+.PHONY: fuzz-runtime
+fuzz-runtime:
 	AQOS_FUZZ_SECONDS=$(patsubst %s,%,$(FUZZTIME)) $(CARGO) test --locked --release --manifest-path $(RUNTIME_MANIFEST) --test generative -- --ignored --nocapture
 
 .PHONY: fuzz-go-reference
@@ -105,7 +110,7 @@ fuzz-go-reference:
 SOAK_SECONDS ?= 21600
 SOAK_RESULTS ?= results-rust-soak
 .PHONY: soak-runtime
-soak-runtime: build
+soak-runtime: build build-rust build-runtime
 	.venv/bin/python scripts/soak-runtime.py --seconds $(SOAK_SECONDS) --results "$(SOAK_RESULTS)"
 
 env:

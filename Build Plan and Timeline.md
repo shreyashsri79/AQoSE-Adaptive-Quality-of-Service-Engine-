@@ -4,7 +4,7 @@ Companion to [the PRD](<Adaptive QoS Engine Product Requirements (Teliport S4).m
 
 **Team.** Two people. The PRD still lists three members, so its owner columns are out of date; this plan replaces them.
 
-- **Systems**: everything except ML. Testbed, Rust controller, Linux networking, enforcement, safety, dashboard, demo.
+- **Systems**: everything except ML. Testbed, Go controller, Linux networking, enforcement, safety, dashboard, demo.
 - **ML**: data, classifier, decision rule, reclassification logic, QoE verifier, experiments, statistics, report.
 
 ## How to read this plan
@@ -29,7 +29,7 @@ Companion to [the PRD](<Adaptive QoS Engine Product Requirements (Teliport S4).m
 | Feature record | The numbers that describe one flow: sizes and gaps of its first 8 packets, plus per-second statistics. No payload and no addresses |
 | QoE | Quality as the application experiences it: latency, jitter, loss, missed frames, video stalls |
 | Seed | The number that fixes the random choices of a run. The same seed gives the same traffic, so two configurations can be compared on identical traffic |
-| Controller | `aqosd`, the Rust program on the router that runs the pipeline |
+| Controller | `aqosd`, the Go program on the router that runs the pipeline |
 
 **Configurations** are the router setups being compared.
 
@@ -58,7 +58,7 @@ Companion to [the PRD](<Adaptive QoS Engine Product Requirements (Teliport S4).m
 
 - Pin the kernel, iproute2, nftables, Go, Python and its libraries, Grafana and Prometheus, and record them in [VERSIONS.md](VERSIONS.md).
 - `make env` checks a machine against those pins and fails on a missing tool, a version mismatch or a missing kernel module.
-- `make check` runs Rust format/clippy/tests, Go reference tests and Python contract tests. Every later chunk adds its tests to this command.
+- `make check` runs Go formatting/vet/tests and Python contract tests. Rust checks are explicit optional targets. Every later chunk adds its tests to this command.
 - **Status:** built on the reference laptop. The second laptop has not been checked yet.
 
 ### 1B. Interface contracts
@@ -227,7 +227,7 @@ There are seven contracts, each a JSON Schema with an example in [contracts/](co
 - The controller touches a heartbeat file every 250 ms.
 - The watchdog checks the file's age. If it is older than 2 s, it removes the marking rules and sets both CAKE instances to safe fixed rates.
 - The timeout is 2 s so that the safe state is reached within 3 s in total, which is the PRD's limit.
-- It is an independent Rust crate with no controller/classifier dependency; a controller crash cannot take the watchdog down.
+- The Go watchdog is a separate process; the retained Rust version is an independent crate with no controller/classifier dependency; a controller crash cannot take the watchdog down.
 - Tested by killing and by freezing the controller, 20 times each.
 - **Needed by:** scenario S10 and the fault demo in 8C.
 - **Status:** built. Safe state reached 2.06 to 2.14 s after the controller is killed or frozen, over 20 trials (10 of each).
@@ -252,7 +252,7 @@ There are seven contracts, each a JSON Schema with an example in [contracts/](co
 - **Envelopes:** for each class, the normal range (5th to 95th percentile) of each window statistic. The reclassifier in 7A uses them.
 - **Evaluation code:** one function that scores any classifier, including the rules from 4B.
 - **Service:** `aqos_ml.serve`, a small Python program on the router that the controller sends requests to. If it is slow or down, flows stay unlabelled.
-- **Runtime choice (updated after migration):** the Rust service is the default. Python remains available explicitly for rules baselines and research ablations; Go is a comparison reference.
+- **Runtime choice:** the Go service is the default. Python remains available explicitly for rules baselines and research ablations; Rust is optional.
 - **Needed by:** 6A, 6B and 7A.
 - **Status:** the code is built and tested: the feature function, training with calibration, the saved model, and the service with its request format in `contracts/`. It was tried on a draft dataset only. The real models are trained when dataset `v1` is sealed, with one command.
 
@@ -542,9 +542,12 @@ Never cut: S1, S6, S7 and S8 on B2, B4, O1 and O2, plus the watchdog and S10. Th
 - [ ] Confirm public dataset licences before use (only if that stretch item is picked up)
 
 
-### Rust runtime migration validation
+### Rust runtime migration validation (historical)
 
-The complete runtime and classifier default to Rust. `AQOS_RUNTIME` and
+Go is now restored as the default runtime, classifier, canonical commands and
+dataset extractor. The Rust implementation and newer research files are retained;
+`make test-rust test-runtime` validates Rust explicitly. The checklist below
+records the earlier migration, when the complete runtime and classifier defaulted to Rust. `AQOS_RUNTIME` and
 `AQOS_SERVICE` remain explicit overrides for reference experiments. This migration retains Python research tooling and the Go
 testbed. Runtime crates forbid unsafe Rust; the watchdog is a separate crate with
 no controller/model dependencies. Build and validation commands are in README.

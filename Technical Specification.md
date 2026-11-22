@@ -86,19 +86,19 @@ Solid arrows carry decisions, dotted arrows carry observations, and the thick ar
 | Process | Language | Runs in | Owner | Role |
 | --- | --- | --- | --- | --- |
 | `aqos-testbed` | Go | Host | Systems | Builds and tears down namespaces, links and impairments from a scenario file |
-| `aqosd` / `aqosd-rs` | Rust | Router namespace | Systems | The controller: extractor, flow table, shield, enforcer, capacity estimator, envelope checks, intent API, heartbeat |
-| `aqos-watchdog` / `aqos-watchdog-rs` | Independent Rust crate | Router namespace | Systems | Applies the safe CAKE configuration when the controller stops |
-| `aqos-extract` / `aqos-extract-rs` | Rust | Host | Systems | Offline: turns a pcap into feature records with the same code `aqosd` uses |
-| `aqos-classify` | Rust | Router namespace | Systems / ML | Default native model inference and decision service |
-| `aqos-classify-rs` | Rust (alias) | Router namespace | Systems / ML | Explicit alias for the default native inference and decision service |
+| `aqosd` | Go | Router namespace | Systems | The controller: extractor, flow table, shield, enforcer, capacity estimator, envelope checks, intent API, heartbeat |
+| `aqos-watchdog` | Go | Router namespace | Systems | Applies the safe CAKE configuration when the controller stops |
+| `aqos-extract` | Go | Host | Systems | Offline: turns a pcap into feature records with the same code `aqosd` uses |
+| `aqos-classify` | Go | Router namespace | Systems / ML | Default native model inference and decision service |
+| `aqos-classify-rs` | Rust (optional) | Router namespace | Systems / ML | Explicitly selected Rust inference and decision service |
 | `aqos_ml.serve` | Python | Router namespace | ML | Local service: classify, decide, verify |
 | `aqos_ml.gen` | Python | Host and server namespaces | ML | Traffic generators and their servers |
 | `aqos_ml.run` | Python | Host | ML | Experiment runner |
 | `aqos_ml.train`, `aqos_ml.report` | Python | Host | ML | Training, statistics, charts |
-| `aqos-exporter` / `aqos-exporter-rs` | Rust | Host | Systems | Tails the current run's `metrics.jsonl` and serves it to Prometheus |
+| `aqos-exporter` | Go | Host | Systems | Tails the current run's `metrics.jsonl` and serves it to Prometheus |
 | Prometheus, Grafana | Containers | Host | Systems | Dashboard |
 
-The Rust implementation optimises work per **flow record**. CAKE continues to
+The retained optional Rust implementation optimises work per **flow record**. CAKE continues to
 queue packets in the kernel. The classifier uses fixed feature/probability
 arrays, compact validated tree references, and reusable response buffers. Its
 release build uses link-time optimisation and strips symbols; it has no async
@@ -108,13 +108,14 @@ Go service decisions, then show a gain in repeated matched benchmarks. The
 [README](README.md) links the measurements and live controller validation;
 laptop classifier timings do not establish router throughput or network QoE.
 
-The default runtime is Rust (`AQOS_RUNTIME=rust`), with the Rust classifier
-selected independently by default (`AQOS_SERVICE=rust`). `aqos-ctl-rs`, `aqos-cake-reader-rs`, and `aqos-reflector-rs`
-complete the runtime tools. The host testbed and Python research tooling retain
-their existing languages. Go runtime implementations are comparison references
-under `bin/go/`, built only by `make build-go-reference`; they cannot overwrite
-the canonical Rust command names. `make check` covers all three Rust crates,
-Go references and Python tooling. `make install-runtime` stages only Rust commands.
+The default runtime and classifier are Go (`AQOS_RUNTIME=go`, `AQOS_SERVICE=go`).
+`make build` builds `bin/go/` and points the canonical commands to those binaries.
+`make check` covers Go and Python; `make install-runtime` stages Go commands.
+The host testbed and Python research tooling retain their existing languages.
+Rust sources, newer research files and migration evidence remain available.
+Build the optional Rust commands with `make build-rust build-runtime` and select
+`AQOS_RUNTIME=rust AQOS_SERVICE=rust`; validate them with `make test-rust test-runtime`.
+The Rust-specific behavior and fixes described below have not been ported to Go.
 
 The Rust controller owns mutable flow state on one event loop. Classifier work
 uses a bounded nonblocking Unix connection with deadlines and request IDs;
@@ -178,7 +179,7 @@ data/           captures and datasets                           (raw data git-ig
 - Python 3.14 virtual environment in `.venv`. `requirements.txt` pins direct dependencies; `requirements.lock` pins the full resolved set and was confirmed to reproduce exactly in a fresh environment.
 - [VERSIONS.md](VERSIONS.md) records every pinned version, including Grafana 13.2.3 and Prometheus 3.15.0 by container tag.
 - `make env` runs `scripts/check-env.sh`, which fails on a missing required tool, a version mismatch, a missing kernel module or a virtual environment that differs from the lock file.
-- `make check` builds the default Rust commands, runs Rust formatting/clippy/tests and differential contracts, then Go reference checks and the Python suite. The Go testbed remains development tooling.
+- `make check` builds the default Go commands, runs Go formatting/vet/tests and the Python contract and unit suite. Rust checks remain explicit targets. The Go testbed remains development tooling.
 - `make testbed-check` builds the real testbed and runs traffic through it. It replaces any running testbed and takes about a minute, so it is separate.
 
 Open: the second laptop has not been checked, and three optional tools are not installed (`conntrack-tools`, `iperf3`, `irtt`).
@@ -655,7 +656,7 @@ The rules sit behind the same interface as the model so the two are scored ident
 - **Check.** The watchdog reads the file's age every 250 ms. An age over 2 s triggers the safe state.
 - **Safe state.** Remove the marking rule and filter; set both CAKE instances to the configured conservative fixed rates with `diffserv4`. Existing conntrack marks are left in place and are simply no longer read.
 - **Timing.** Detection takes at most 2.25 s, leaving 0.75 s for the two `tc` commands and the rule removal inside the PRD's 3 s limit.
-- **Dependencies.** Independent Rust crate with serde/serde_json, rustix and signal-hook, plus `ip`, `tc` and `nft`. It reads its rates from a small file written at startup and shares no runtime code with the controller.
+- **Dependencies.** The default watchdog is Go; the optional Rust watchdog is an independent crate with serde/serde_json, rustix and signal-hook. Both use `ip`, `tc` and `nft`, read rates from a small file written at startup, and run independently of the controller process.
 - **Recovery.** When the heartbeat returns, the watchdog does nothing. The controller reinstalls marking itself as part of its startup.
 
 The PRD says both "misses heartbeats for 3 s" and "reaches safe state within 3 s". Both cannot hold, so the timeout here is 2 s and the 3 s figure is the end-to-end limit.
@@ -717,7 +718,7 @@ Derived features (for example bytes in each direction among the first 8) may be 
 
 This request format is a contract: `service_request` and `service_response` in `contracts/`.
 
-**Runtime choice (migrated).** The default is the Rust native service with validated exported trees. Python remains explicit for the B4 rules reference and feature-noise experiments. Go is a separately built comparison reference.
+**Runtime choice.** The default is the Go native service with exported trees. Python remains explicit for the B4 rules reference and feature-noise experiments. Rust remains available through `AQOS_SERVICE=rust`.
 
 **Failure.** The controller gives each request a deadline (starting value 50 ms) and keeps a bounded queue of pending requests (starting value 1,024). A timeout, an error or a full queue leaves the flow unlabelled.
 
@@ -1063,7 +1064,8 @@ Achieved rate and load come from CAKE's byte counters.
 
 ### 9.4 Chunk 7D: intent service (M8, Systems, Built; the 1 s target not met)
 
-**API.** HTTP on localhost inside the controller.
+**API.** HTTP on localhost inside the controller. The default Go API retains its
+original unauthenticated behavior and should remain on loopback.
 
 | Call | Effect |
 | --- | --- |

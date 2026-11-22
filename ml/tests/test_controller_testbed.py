@@ -92,13 +92,11 @@ def test_model_in_the_controller(tmp_path):
             print(f"  {action['t_s']:6.1f} s  {action['outcome']:9} {action['proposal']['reason']}")
 
 
-def test_default_rust_runtime_handles_capacity_drop_and_intent(tmp_path, monkeypatch):
+def test_runtime_handles_capacity_drop_and_intent(tmp_path):
     """Exercise probes, rate enforcement, the intent HTTP API and verification together."""
     import yaml
-    monkeypatch.delenv("AQOS_RUNTIME", raising=False)
-    monkeypatch.delenv("AQOS_SERVICE", raising=False)
     scenario = yaml.safe_load(SCENARIO.read_text())
-    scenario.update(id="S902", name="Rust capacity and intent integration", duration_s=32, warmup_s=4)
+    scenario.update(id="S902", name="Runtime capacity and intent integration", duration_s=32, warmup_s=4)
     scenario["traffic"][1]["start_s"] = 4
     scenario["events"] = [
         {"at_s": 6, "type": "intent_lease", "args": {"host": "laptop", "minutes": 1}},
@@ -110,7 +108,8 @@ def test_default_rust_runtime_handles_capacity_drop_and_intent(tmp_path, monkeyp
     assert manifest["valid"], manifest["invalid_reason"]
     out = tmp_path / "runs" / manifest["run_id"]
     env = json.loads((out / "environment.json").read_text())
-    assert env["runtime"] == env["service"] == "rust"
+    assert env["runtime"] == os.environ.get("AQOS_RUNTIME", "go")
+    assert env["service"] == os.environ.get("AQOS_SERVICE", "go")
     report = json.loads((out / "controller.json").read_text())
     assert report["flows"]["errors"] == report["flows"]["mismatch"] == report["extractor"]["overflows"] == 0
     assert report["flows"]["rate_changes"] > 0
